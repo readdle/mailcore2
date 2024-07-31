@@ -19,7 +19,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Select XCode 14.2
-      run: sudo xcode-select --switch /Applications/Xcode_14.2.app
+      run: |
+        echo "$(uname -m)"
+        sudo xcode-select --switch /Applications/Xcode_14.2.app
     - name: Install NDK
       run: $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "ndk;25.2.9519653"
     - name: Install Swift Android Toolchain
