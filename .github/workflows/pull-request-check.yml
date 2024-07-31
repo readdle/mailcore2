@@ -19,9 +19,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Select XCode 14.2
-      run: |
-        echo "$(uname -m)"
-        sudo xcode-select --switch /Applications/Xcode_14.2.app
+      run: sudo xcode-select --switch /Applications/Xcode_14.2.app
     - name: Install NDK
       run: $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "ndk;25.2.9519653"
     - name: Install Swift Android Toolchain
@@ -31,9 +29,9 @@ jobs:
     - name: Install Android Emulator
       run: $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "system-images;android-29;google_apis;x86_64"
     - name: Create Android Emulator
-      run: $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager create avd -n ci-test -k "system-images;android-29;google_apis;x86_64" -d "pixel" --force
+      run: $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager create avd -n ci-test -k "system-images;android-29;google_apis;x86_64" -d "pixel" --abi google_apis/x86_64
     - name: Start Android Emulator
-      run: $ANDROID_HOME/emulator/emulator -no-window -avd ci-test -noaudio > /dev/null &
+      run: $ANDROID_HOME/emulator/emulator -no-window -avd ci-test -noaudio -timezone America/Los_Angeles -partition-size 4000 > /dev/null &
     - name: Run connected android tests
       run: export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653;
         export SWIFT_ANDROID_HOME=$(pwd)/swift-android;
