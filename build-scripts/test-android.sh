@@ -2,6 +2,8 @@
 
 set -ex
 
+export SWIFT_ANDROID_ICU_VERSION="73"
+
 function finish {
   exit_code=$?
     adb -s $ANDROID_SERIAL emu kill
