@@ -30,6 +30,8 @@ jobs:
       run: $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "system-images;android-29;google_apis;x86_64"
     - name: Create Android Emulator
       run: $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager create avd -n ci-test -k "system-images;android-29;google_apis;x86_64" -d "pixel" --abi google_apis/x86_64
+    - name: Start ADB Server
+      run: adb start-server
     - name: Start Android Emulator
       run: $ANDROID_HOME/emulator/emulator -no-window -avd ci-test -noaudio -timezone America/Los_Angeles -partition-size 4000 > /dev/null &
     - name: Run connected android tests
