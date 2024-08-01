@@ -28,18 +28,9 @@ jobs:
         swift-android/bin/swift-android tools --update;
     - name: Install Android Emulator
       run: $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "system-images;android-29;google_apis;x86_64"
-    - name: Create Android Emulator
-      run: $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager create avd -n ci-test -k "system-images;android-29;google_apis;x86_64" -d "pixel" --abi google_apis/x86_64
-    - name: Start ADB Server
-      run: adb start-server
-    - name: Start Android Emulator
-      run: $ANDROID_HOME/emulator/emulator -no-window -avd ci-test -noaudio -timezone America/Los_Angeles -partition-size 4000 > /dev/null &
     - name: Run connected android tests
-      run: export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653;
-        export SWIFT_ANDROID_HOME=$(pwd)/swift-android;
-        export PATH=$ANDROID_NDK_HOME:$PATH;
-        export PATH=$SWIFT_ANDROID_HOME/bin:$SWIFT_ANDROID_HOME/build-tools/current:$PATH;
-        adb wait-for-device;
+      run: export ANDROID_NDK_ROOT_25C=$ANDROID_HOME/ndk/25.2.9519653;
+        export SWIFT_ANDROID_HOME_5_7=$(pwd)/swift-android;
         ./build-scripts/test-android.sh
     - name: Publish Report
       uses: mikepenz/action-junit-report@v3
