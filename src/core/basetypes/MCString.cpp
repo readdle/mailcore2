@@ -1703,8 +1703,13 @@ static void charactersParsed(void * context,
 }
 
 /* GCS: custom error function to ignore errors */
+#if defined(ANDROID)
+static void structuredError(void * userData,
+                            const xmlError *error)
+#else
 static void structuredError(void * userData,
                             xmlErrorPtr error)
+#endif
 {
     /* ignore all errors */
     (void)userData;

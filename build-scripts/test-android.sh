@@ -67,12 +67,7 @@ mkdir -p .build/reports
 mkdir -p .build/debug
 adb logcat | ndk-stack -sym .build/debug > .build/reports/ndk-stack.log &
 
-# Build
-pass_to_swiftc="-Xbuild -Xswiftc -Xbuild"
-pass_to_frontend="$pass_to_swiftc -Xfrontend $pass_to_swiftc"
-
-swift-test --deploy \
-    $pass_to_frontend -experimental-disable-objc-attr
+swift-test --deploy
 
 # Test
 swift-test --just-run | tee .build/reports/test.log

@@ -4,8 +4,6 @@
 import PackageDescription
 import Foundation
 
-let ICUVersion = ProcessInfo.processInfo.environment["SWIFT_ANDROID_ICU_VERSION"] ?? ""
-
 var CMailCoreExcludes = [
     "core/basetypes/MCDataMac.mm",
     "core/rfc822/MCMessageParserMac.mm",
@@ -242,9 +240,7 @@ var targets: [Target] = [
             .linkedLibrary("xml2"),
             .linkedLibrary("resolv", .when(platforms: [.iOS, .macOS])),
             .linkedLibrary("log", .when(platforms: [.android])),
-            .linkedLibrary("icuuc.\(ICUVersion)", .when(platforms: [.android])),
-            .linkedLibrary("icui18n.\(ICUVersion)", .when(platforms: [.android])),
-            .linkedLibrary("icudata.\(ICUVersion)", .when(platforms: [.android])),
+            .linkedLibrary("_FoundationICU", .when(platforms: [.android]))
         ]
     ),
     .target(
