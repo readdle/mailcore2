@@ -178,7 +178,7 @@ let products: [Product] = [
 ]
 
 let dependencies: [Package.Dependency] = [
-    .package(name: "libetpan", url: "https://github.com/readdle/libetpan.git", .exact("1.9.3-readdle.6")),
+    .package(name: "libetpan", url: "https://github.com/readdle/libetpan.git", .exact("1.9.3-readdle.7")),
     .package(name: "tidy-html5", url: "https://github.com/readdle/tidy-html5.git", .exact("5.4.0-readdle.28")),
     .package(name: "ctemplate", url: "https://github.com/readdle/ctemplate.git", .exact("2.2.3-readdle.4")),
     .package(name: "unicode", url: "https://github.com/readdle/swift-unicode", .exact("68.2.0"))
