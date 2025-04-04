@@ -42,7 +42,7 @@ namespace mailcore {
         virtual Data * dataForEncryption();
 
         // Store builded message to file.
-        virtual ErrorCode writeToFile(String * filename);
+        virtual ErrorCode writeToFile(String * filename, bool useXAttachmentId);
 
         virtual String * htmlRendering(HTMLRendererTemplateCallback * htmlCallback = NULL);
         virtual String * htmlBodyRendering();

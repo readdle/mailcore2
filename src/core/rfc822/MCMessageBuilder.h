@@ -42,7 +42,7 @@ namespace mailcore {
         virtual Data * dataForEncryption();
 
         // Store builded message to file.
-        virtual ErrorCode writeToFile(String * filename);
+        virtual ErrorCode writeToFile(String * filename, bool useXAttachmentId);
 
         virtual String * htmlRendering(HTMLRendererTemplateCallback * htmlCallback = NULL);
         virtual String * htmlBodyRendering();
@@ -71,7 +71,7 @@ namespace mailcore {
         String * mBoundaryPrefix;
         void init();
         Data * dataAndFilterBccAndForEncryption(bool filterBcc, bool forEncryption);
-        struct mailmime * mimeAndFilterBccAndForEncryption(bool filterBcc, bool forEncryption);
+        struct mailmime * mimeAndFilterBccAndForEncryption(bool filterBcc, bool forEncryption, bool useXAttachmentId);
         Array * mBoundaries;
         unsigned int mCurrentBoundaryIndex;
     };

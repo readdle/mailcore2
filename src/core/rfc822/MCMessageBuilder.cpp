@@ -182,7 +182,7 @@ static struct mailmime * get_text_part(MessageBuilder * builder,
     if (dup_description != NULL)
         dup_description = strdup(description);
     mime_fields = mailmime_fields_new_with_data(encoding,
-                                                dup_content_id, dup_description, disposition, NULL);
+                                                dup_content_id, dup_description, disposition, NULL, 0);
     
     content = mailmime_content_new_with_str(mime_type);
     if (charset == NULL) {
@@ -242,7 +242,8 @@ static struct mailmime * get_file_part(MessageBuilder * builder,
                                        const char * filename, const char * mime_type, int is_inline,
                                        const char * content_id,
                                        const char * content_description,
-                                       const char * text, size_t length, clist * contentTypeParameters)
+                                       const char * text, size_t length, clist * contentTypeParameters,
+                                       int useXAttachmentId)
 {
     char * disposition_name;
     int encoding_type;
@@ -277,7 +278,7 @@ static struct mailmime * get_file_part(MessageBuilder * builder,
     if (content_description != NULL)
         dup_content_description = strdup(content_description);
     mime_fields = mailmime_fields_new_with_data(encoding,
-                                                dup_content_id, dup_content_description, disposition, NULL);
+                                                dup_content_id, dup_content_description, disposition, NULL, useXAttachmentId);
     
     if (contentTypeParameters != NULL) {
         clist_concat(content->ct_parameters, contentTypeParameters);
@@ -308,7 +309,7 @@ static clist * content_type_parameters_from_attachment(Attachment * att)
     return contentTypeParameters;
 }
 
-static struct mailmime * mime_from_attachment(MessageBuilder * builder, Attachment * att, bool forEncryption)
+static struct mailmime * mime_from_attachment(MessageBuilder * builder, Attachment * att, bool forEncryption, bool useXAttachmentId)
 {
     struct mailmime * mime;
     Data * data;
@@ -347,7 +348,8 @@ static struct mailmime * mime_from_attachment(MessageBuilder * builder, Attachme
                                  MCUTF8(att->contentID()),
                                  MIME_ENCODED_STR(att->contentDescription()),
                                  data->bytes(), data->length(),
-                                 contentTypeParameters);
+                                 contentTypeParameters,
+                                 useXAttachmentId);
         }
         if (contentTypeParameters != NULL) {
             clist_free(contentTypeParameters);
@@ -358,7 +360,7 @@ static struct mailmime * mime_from_attachment(MessageBuilder * builder, Attachme
 
 static struct mailmime * multipart_related_from_attachments(MessageBuilder * builder,
     Attachment * htmlAttachment,
-    Array * attachments, const char * boundary_prefix, bool forEncryption)
+    Array * attachments, const char * boundary_prefix, bool forEncryption, bool useXAttachmentId)
 {
     if ((attachments != NULL) && (attachments->count() > 0)) {
         struct mailmime * submime;
@@ -366,14 +368,14 @@ static struct mailmime * multipart_related_from_attachments(MessageBuilder * bui
         
         mime = get_multipart_related(builder, boundary_prefix);
         
-        submime = mime_from_attachment(builder, htmlAttachment, forEncryption);
+        submime = mime_from_attachment(builder, htmlAttachment, forEncryption, false);
         add_attachment(builder, mime, submime, boundary_prefix);
         
         for(unsigned int i = 0 ; i < attachments->count() ; i ++) {
             Attachment * attachment;
             
             attachment = (Attachment *) attachments->objectAtIndex(i);
-            submime = mime_from_attachment(builder, attachment, forEncryption);
+            submime = mime_from_attachment(builder, attachment, forEncryption, useXAttachmentId);
             add_attachment(builder, mime, submime, boundary_prefix);
         }
         
@@ -382,7 +384,7 @@ static struct mailmime * multipart_related_from_attachments(MessageBuilder * bui
     else {
         struct mailmime * mime;
         
-        mime = mime_from_attachment(builder, htmlAttachment, forEncryption);
+        mime = mime_from_attachment(builder, htmlAttachment, forEncryption, false);
         
         return mime;
     }
@@ -702,7 +704,7 @@ String * MessageBuilder::boundaryPrefix()
     return mBoundaryPrefix;
 }
 
-struct mailmime * MessageBuilder::mimeAndFilterBccAndForEncryption(bool filterBcc, bool forEncryption)
+struct mailmime * MessageBuilder::mimeAndFilterBccAndForEncryption(bool filterBcc, bool forEncryption, bool useXAttachmentId)
 {
     struct mailmime * htmlPart;
     struct mailmime * textPart;
@@ -720,20 +722,20 @@ struct mailmime * MessageBuilder::mimeAndFilterBccAndForEncryption(bool filterBc
         
         htmlAttachment = Attachment::attachmentWithHTMLString(htmlBody());
         htmlPart = multipart_related_from_attachments(this, htmlAttachment, mRelatedAttachments,
-                                                      MCUTF8(mBoundaryPrefix), forEncryption);
+                                                      MCUTF8(mBoundaryPrefix), forEncryption, useXAttachmentId);
     }
     
     if (textBody() != NULL) {
         Attachment * textAttachment;
         
         textAttachment = Attachment::attachmentWithText(textBody());
-        textPart = mime_from_attachment(this, textAttachment, forEncryption);
+        textPart = mime_from_attachment(this, textAttachment, forEncryption, false);
     }
     else if (htmlBody() != NULL) {
         Attachment * textAttachment;
         
         textAttachment = Attachment::attachmentWithText(htmlBody()->flattenHTML());
-        textPart = mime_from_attachment(this, textAttachment, forEncryption);
+        textPart = mime_from_attachment(this, textAttachment, forEncryption, false);
     }
     
     if ((textPart != NULL) && (htmlPart != NULL)) {
@@ -768,7 +770,7 @@ struct mailmime * MessageBuilder::mimeAndFilterBccAndForEncryption(bool filterBc
             struct mailmime * submime;
             
             attachment = (Attachment *) attachments()->objectAtIndex(i);
-            submime = mime_from_attachment(this, attachment, forEncryption);
+            submime = mime_from_attachment(this, attachment, forEncryption, false);
             add_attachment(this, mime, submime, MCUTF8(mBoundaryPrefix));
         }
     }
@@ -791,7 +793,7 @@ Data * MessageBuilder::dataAndFilterBccAndForEncryption(bool filterBcc, bool for
     
     str = mmap_string_new("");
     col = 0;
-    struct mailmime * mime = mimeAndFilterBccAndForEncryption(filterBcc, forEncryption);
+    struct mailmime * mime = mimeAndFilterBccAndForEncryption(filterBcc, forEncryption, false);
     mailmime_write_mem(str, &col, mime);
     data = Data::dataWithBytes(str->str, (unsigned int) str->len);
     mmap_string_free(str);
@@ -810,7 +812,7 @@ Data * MessageBuilder::dataForEncryption()
     return dataAndFilterBccAndForEncryption(false, true);
 }
 
-ErrorCode MessageBuilder::writeToFile(String * filename)
+ErrorCode MessageBuilder::writeToFile(String * filename, bool useXAttachmentId)
 {
     FILE * f = fopen(filename->fileSystemRepresentation(), "wb");
     if (f == NULL) {
@@ -818,7 +820,7 @@ ErrorCode MessageBuilder::writeToFile(String * filename)
     }
 
     ErrorCode error = ErrorNone;
-    struct mailmime * mime = mimeAndFilterBccAndForEncryption(false, false);
+    struct mailmime * mime = mimeAndFilterBccAndForEncryption(false, false, useXAttachmentId);
 
     int col = 0;
     int r = mailmime_write_file(f, &col, mime);
@@ -884,7 +886,7 @@ Data * MessageBuilder::openPGPSignedMessageDataWithSignatureData(Data * signatur
     
     struct mailmime * multipart = get_multipart_signed_pgp(NULL, MCUTF8(boundaryPrefix()));
     add_attachment(NULL, mime, multipart, MCUTF8(boundaryPrefix()));
-    struct mailmime * part_to_sign = mimeAndFilterBccAndForEncryption(false, true);
+    struct mailmime * part_to_sign = mimeAndFilterBccAndForEncryption(false, true, false);
     add_attachment(NULL, multipart, part_to_sign, MCUTF8(boundaryPrefix()));
     struct mailmime * signature_part = get_signature_part(signature);
     add_attachment(NULL, multipart, signature_part, MCUTF8(boundaryPrefix()));

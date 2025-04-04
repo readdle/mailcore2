@@ -21,7 +21,7 @@ public class MCOMailProvidersManager: NSObjectCompat {
         #if SWIFT_PACKAGE
         filename = Bundle.module.path(forResource: "providers", ofType: "json")
         #else
-        let filename = Bundle(for: MCOMailProvidersManager.self).path(forResource: "providers", ofType: "json")
+        filename = Bundle(for: MCOMailProvidersManager.self).path(forResource: "providers", ofType: "json")
         #endif
         if let filename = filename {
             MCOMailProvidersManager.registerProviders(filename: filename)

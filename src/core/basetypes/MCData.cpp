@@ -240,6 +240,9 @@ static String * normalizeCharset(String * charset)
     else if (charset->caseInsensitiveCompare(MCSTR("koi8_r")) == 0) {
         charset = MCSTR("KOI8-R");
     }
+    else if (charset->caseInsensitiveCompare(MCSTR("koi8_u")) == 0) {
+        charset = MCSTR("KOI8-U");
+    }
     
     return charset->lowercaseString();
 }
@@ -264,7 +267,7 @@ static bool isHintWindowsCharset(String * hintCharset)
 
 static bool isHintCyrillicCharset(String * hintCharset)
 {
-    return hintCharset->hasPrefix(MCSTR("koi8-r"));
+    return hintCharset->hasPrefix(MCSTR("koi8-r")) || hintCharset->hasPrefix(MCSTR("koi8-u"));
 }
 
 static bool isHintCharsetValid(String * hintCharset)
@@ -338,6 +341,9 @@ static bool isHintCharsetValid(String * hintCharset)
             return true;
         }
         else if (hintCharset->isEqual(MCSTR("koi8-r"))) {
+            return true;
+        }
+        else if (hintCharset->isEqual(MCSTR("koi8-u"))) {
             return true;
         }
         else if (hintCharset->isEqual(MCSTR("euc-kr"))) {

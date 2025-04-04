@@ -34,7 +34,7 @@ extern "C" {
     C_SYNTHESIZE_FUNC_DEFINITION(CMessageBuilder, CData, data)
     C_SYNTHESIZE_FUNC_DEFINITION(CMessageBuilder, CData, dataForEncryption)
     
-    C_SYNTHESIZE_FUNC_DEFINITION(CMessageBuilder, ErrorCode, writeToFile, MailCoreString)
+    C_SYNTHESIZE_FUNC_DEFINITION(CMessageBuilder, ErrorCode, writeToFile, MailCoreString, bool)
     
     C_SYNTHESIZE_FUNC_DEFINITION(CMessageBuilder, CData, openPGPSignedMessageDataWithSignatureData, CData)
     C_SYNTHESIZE_FUNC_DEFINITION(CMessageBuilder, CData, openPGPEncryptedMessageDataWithEncryptedData, CData)
