@@ -3,16 +3,15 @@
 set -ex
 
 # Create variables
-export SWIFT_ANDROID_HOME=$SWIFT_ANDROID_HOME_5_7
+export SWIFT_ANDROID_HOME=$SWIFT_ANDROID_HOME_6_0_3
 export SWIFT_ANDROID_API_LEVEL=26
-export SWIFT_ANDROID_ICU_VERSION=73
-export ANDROID_NDK=$ANDROID_NDK_ROOT_25C
+export ANDROID_NDK=$ANDROID_NDK_ROOT_26C
 export ANDROID_NDK_ROOT=$ANDROID_NDK
 export ANDROID_NDK_HOME=$ANDROID_NDK
 
 # Update PATH
 export PATH=$ANDROID_NDK:$PATH
-export PATH=$SWIFT_ANDROID_HOME/bin:$SWIFT_ANDROID_HOME/build-tools/current:$PATH
+export PATH=$SWIFT_ANDROID_HOME/build-tools:$PATH
 
 # Emulator
 export BUILD_ANDROID=1
@@ -67,10 +66,10 @@ mkdir -p .build/reports
 mkdir -p .build/debug
 adb logcat | ndk-stack -sym .build/debug > .build/reports/ndk-stack.log &
 
-swift-test --deploy
+swift android test --deploy
 
 # Test
-swift-test --just-run | tee .build/reports/test.log
+swift android test --just-run | tee .build/reports/test.log
 return_code=${PIPESTATUS[0]}
 
 cat .build/reports/test.log | xcbeautify --report junit --report-path .build/reports
