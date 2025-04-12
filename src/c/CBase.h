@@ -5,16 +5,10 @@
 #include <stdint.h>
 
 //TODO: fix ICUBasetypes
-#ifdef _MSC_VER
-
+#if defined(_MSC_VER) || defined(ANDROID)
 #include <unicode/uchar.h>
-
 #elif defined(__CHAR16_TYPE__)
-	#if defined(ANDROID)
-	typedef char16_t UChar;
-	#else
-	typedef __CHAR16_TYPE__ UChar;
-	#endif
+typedef __CHAR16_TYPE__ UChar;
 #else
 typedef uint16_t UChar;
 #endif

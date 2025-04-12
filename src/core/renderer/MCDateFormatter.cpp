@@ -246,7 +246,11 @@ void DateFormatter::prepare()
     int32_t patternLength = -1;
     UErrorCode err = U_ZERO_ERROR;
     const char * locale = NULL;
-    
+
+    #if UNIT_TESTS
+    mTimezone = String::stringWithUTF8Characters("America/Los_Angeles");
+    #endif
+
     if (mTimezone != NULL) {
         tzID = mTimezone->unicodeCharacters();
         tzIDLength = mTimezone->length();
