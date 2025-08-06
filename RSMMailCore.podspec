@@ -88,6 +88,7 @@ Pod::Spec.new do |s|
       "build-mac/MailCore.modulemap"
 
     ss.resources = "resources/providers.json"
+    ss.resources = "resources/Reactions.json"
     ss.dependency "RSMMailCore/etpan"
     ss.dependency "RSMMailCore/ctemplate"
     ss.dependency "RSMMailCore/sasl2"

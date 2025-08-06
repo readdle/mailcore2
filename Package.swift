@@ -151,6 +151,7 @@ let mailcoreResources: [Resource] = []
 
 mailcoreExcludes += [
     "resources/providers.json"
+    "resources/Reactions.json"
 ]
 
 #else
@@ -167,6 +168,7 @@ let CMailCoreExtensionFiles: [String] = [
 
 let mailcoreResources: [Resource] = [
     .copy("resources/providers.json")
+    .copy("resources/Reactions.json")
 ]
 
 #endif

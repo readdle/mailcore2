@@ -1,0 +1,377 @@
+[
+  {
+    "name": "Happy smiles",
+    "reactions": [
+      {
+        "id": "r-grinning-face",
+        "hex": "1f600",
+        "emoji": "😀"
+      },
+      {
+        "id": "r-smiling-with-squinting-eyes",
+        "hex": "1f60a",
+        "emoji": "😊"
+      },
+      {
+        "id": "r-grinning-with-squinting-eyes",
+        "hex": "1f604",
+        "emoji": "😄"
+      },
+      {
+        "id": "r-tears-of-joy",
+        "hex": "1f602",
+        "emoji": "😂"
+      },
+      {
+        "id": "r-smiling-face",
+        "hex": "263a",
+        "emoji": "☺️"
+      },
+      {
+        "id": "r-slightly-smiling-face",
+        "hex": "1f642",
+        "emoji": "🙂"
+      },
+      {
+        "id": "r-winking-face",
+        "hex": "1f609",
+        "emoji": "😉"
+      },
+      {
+        "id": "r-face-with-starry-eyes",
+        "hex": "1f929",
+        "emoji": "🤩"
+      },
+      {
+        "id": "r-heart-eyes",
+        "hex": "1f60d",
+        "emoji": "😍"
+      },
+      {
+        "id": "r-smiling-face-licking-lips",
+        "hex": "1f60b",
+        "emoji": "😋"
+      },
+      {
+        "id": "r-smiling-face-with-sunglasses",
+        "hex": "1f60e",
+        "emoji": "😎"
+      },
+      {
+        "id": "r-nerdy-face",
+        "hex": "1f913",
+        "emoji": "🤓"
+      },
+      {
+        "id": "r-party-face",
+        "hex": "1f973",
+        "emoji": "🥳"
+      },
+      {
+        "id": "r-happy-face-with-hugging-hands",
+        "hex": "1f917",
+        "emoji": "🤗"
+      }
+    ]
+  },
+  {
+    "name": "Serious smiles",
+    "reactions": [
+      {
+        "id": "r-unamused-face",
+        "hex": "1f612",
+        "emoji": "😒"
+      },
+      {
+        "id": "r-face-with-raised-eyebrow",
+        "hex": "1f928",
+        "emoji": "🤨"
+      },
+      {
+        "id": "r-loudly-crying-face",
+        "hex": "1f62d",
+        "emoji": "😭"
+      },
+      {
+        "id": "r-slightly-frowning-face",
+        "hex": "1f641",
+        "emoji": "🙁"
+      },
+      {
+        "id": "r-cry",
+        "hex": "1f622",
+        "emoji": "😢"
+      },
+      {
+        "id": "r-neutral-face",
+        "hex": "1f610",
+        "emoji": "😐"
+      },
+      {
+        "id": "r-face-with-rolling-eyes",
+        "hex": "1f644",
+        "emoji": "🙄"
+      },
+      {
+        "id": "r-face-with-monocle",
+        "hex": "1f9d0",
+        "emoji": "🧐"
+      },
+      {
+        "id": "r-surprised-face",
+        "hex": "1f62f",
+        "emoji": "😯"
+      },
+      {
+        "id": "r-thinking-face",
+        "hex": "1f914",
+        "emoji": "🤔"
+      },
+      {
+        "id": "r-fearful-face",
+        "hex": "1f628",
+        "emoji": "😨"
+      },
+      {
+        "id": "r-money-mouth-face",
+        "hex": "1f911",
+        "emoji": "🤑"
+      },
+      {
+        "id": "r-face-with-thermometer",
+        "hex": "1f912",
+        "emoji": "🤒"
+      },
+      {
+        "id": "r-smiling-face-with-horns",
+        "hex": "1f608",
+        "emoji": "😈"
+      }
+    ]
+  },
+  {
+    "name": "Hands",
+    "reactions": [
+      {
+        "id": "r-waving-hand",
+        "hex": "1f44b",
+        "emoji": "👋"
+      },
+      {
+        "id": "r-clapping-hands",
+        "hex": "1f44f",
+        "emoji": "👏"
+      },
+      {
+        "id": "r-handshake",
+        "hex": "1f91d",
+        "emoji": "🤝"
+      },
+      {
+        "id": "r-thumbs-up",
+        "hex": "1f44d",
+        "emoji": "👍"
+      },
+      {
+        "id": "r-thumbs-down",
+        "hex": "1f44e",
+        "emoji": "👎"
+      },
+      {
+        "id": "r-fingers-crossed",
+        "hex": "1f91e",
+        "emoji": "🤞"
+      },
+      {
+        "id": "r-victory-hand",
+        "hex": "270c",
+        "emoji": "✌️"
+      },
+      {
+        "id": "r-hands-pressed-together",
+        "hex": "1f64f",
+        "emoji": "🙏"
+      },
+      {
+        "id": "r-sign-of-the-horns",
+        "hex": "1f918",
+        "emoji": "🤘"
+      },
+      {
+        "id": "r-ok-hand-sign",
+        "hex": "1f44c",
+        "emoji": "👌"
+      },
+      {
+        "id": "r-hands-raised-in-celebration",
+        "hex": "1f64c",
+        "emoji": "🙌"
+      },
+      {
+        "id": "r-vulcan-salute",
+        "hex": "1f596",
+        "emoji": "🖖"
+      },
+      {
+        "id": "r-right-fist-bump",
+        "hex": "1f91c",
+        "emoji": "🤜"
+      },
+      {
+        "id": "r-left-fist-bump",
+        "hex": "1f91b",
+        "emoji": "🤛"
+      }
+    ]
+  },
+  {
+    "name": "People",
+    "reactions": [
+      {
+        "id": "r-information-desk-woman",
+        "hex": "1f481-200d-2640-fe0f",
+        "emoji": "💁‍♀️"
+      },
+      {
+        "id": "r-information-desk-man",
+        "hex": "1f481-200d-2642-fe0f",
+        "emoji": "💁‍♂️"
+      },
+      {
+        "id": "r-woman-gesturing-no",
+        "hex": "1f645-200d-2640-fe0f",
+        "emoji": "🙅‍♀️"
+      },
+      {
+        "id": "r-man-gesturing-no",
+        "hex": "1f645-200d-2642-fe0f",
+        "emoji": "🙅‍♂️"
+      },
+      {
+        "id": "r-woman-gesturing-ok",
+        "hex": "1f646-200d-2640-fe0f",
+        "emoji": "🙆‍♀️"
+      },
+      {
+        "id": "r-man-gesturing-ok",
+        "hex": "1f646-200d-2642-fe0f",
+        "emoji": "🙆‍♂️"
+      },
+      {
+        "id": "r-happy-woman-raising-one-hand",
+        "hex": "1f64b-200d-2640-fe0f",
+        "emoji": "🙋‍♀️"
+      },
+      {
+        "id": "r-happy-man-raising-one-hand",
+        "hex": "1f64b-200d-2642-fe0f",
+        "emoji": "🙋‍♂️"
+      },
+      {
+        "id": "r-woman-face-palm",
+        "hex": "1f926-200d-2640-fe0f",
+        "emoji": "🤦‍♀️"
+      },
+      {
+        "id": "r-man-face-palm",
+        "hex": "1f926-200d-2642-fe0f",
+        "emoji": "🤦‍♂️"
+      },
+      {
+        "id": "r-woman-shrugging",
+        "hex": "1f937-200d-2640-fe0f",
+        "emoji": "🤷‍♀️"
+      },
+      {
+        "id": "r-man-shrugging",
+        "hex": "1f937-200d-2642-fe0f",
+        "emoji": "🤷‍♂️"
+      },
+      {
+        "id": "r-woman-dancing",
+        "hex": "1f483",
+        "emoji": "💃"
+      },
+      {
+        "id": "r-man-dancing",
+        "hex": "1f57a",
+        "emoji": "🕺"
+      }
+    ]
+  },
+  {
+    "name": "Symbols",
+    "reactions": [
+      {
+        "id": "r-plus-symbol",
+        "hex": "2795",
+        "emoji": "➕"
+      },
+      {
+        "id": "r-minus-symbol",
+        "hex": "2796",
+        "emoji": "➖"
+      },
+      {
+        "id": "r-checkmark",
+        "hex": "2714",
+        "emoji": "✔️"
+      },
+      {
+        "id": "r-top-arrow",
+        "hex": "1f51d",
+        "emoji": "🔝"
+      },
+      {
+        "id": "r-red-question-mark",
+        "hex": "2753",
+        "emoji": "❓"
+      },
+      {
+        "id": "r-red-exclamation-mark",
+        "hex": "2757",
+        "emoji": "❗️"
+      },
+      {
+        "id": "r-hundred-points-symbol",
+        "hex": "1f4af",
+        "emoji": "💯"
+      },
+      {
+        "id": "r-love-letter",
+        "hex": "1f48c",
+        "emoji": "💌"
+      },
+      {
+        "id": "r-incoming-envelope",
+        "hex": "1f4e8",
+        "emoji": "📨"
+      },
+      {
+        "id": "r-red-heart",
+        "hex": "2764",
+        "emoji": "❤️"
+      },
+      {
+        "id": "r-broken-heart",
+        "hex": "1f494",
+        "emoji": "💔"
+      },
+      {
+        "id": "r-party-popper",
+        "hex": "1f389",
+        "emoji": "🎉"
+      },
+      {
+        "id": "r-confetti-ball",
+        "hex": "1f38a",
+        "emoji": "🎊"
+      },
+      {
+        "id": "r-fire",
+        "hex": "1f525",
+        "emoji": "🔥"
+      }
+    ]
+  }
+]

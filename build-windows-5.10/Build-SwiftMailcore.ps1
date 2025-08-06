@@ -84,6 +84,7 @@ Push-Task -Name $ModuleName -ScriptBlock {
             Copy-Item -Path "$ProductsPath\$ModuleName.swiftmodule" -Destination $IncludeDir -Force -ErrorAction Stop
             Copy-Item -Path "$ProductsPath\$ModuleName.dll" -Destination $BinDir -Force -ErrorAction Stop
             Install-File "$ResourcesPath\providers.json" -Destination $BundleResourcesDir
+            Install-File "$ResourcesPath\Reactions.json" -Destination $BundleResourcesDir
         }
     }
  
