@@ -176,7 +176,7 @@ let products: [Product] = [
 ]
 
 let dependencies: [Package.Dependency] = [
-    .package(name: "libetpan", url: "https://github.com/readdle/libetpan.git", .exact("1.9.3-readdle.8")),
+    .package(name: "libetpan", url: "https://github.com/readdle/libetpan.git", .branch("swift-6.2-android")),
     .package(name: "tidy-html5", url: "https://github.com/readdle/tidy-html5.git", .exact("5.4.0-readdle.28")),
     .package(name: "ctemplate", url: "https://github.com/readdle/ctemplate.git", .exact("2.2.3-readdle.4")),
     .package(name: "unicode", url: "https://github.com/readdle/swift-unicode", .exact("68.2.0"))
@@ -231,7 +231,6 @@ var targets: [Target] = [
             .headerSearchPath("objc/utils"),
             .define("ANDROID", .when(platforms: [.android])),
             .define("UCHAR_TYPE", to: "uint16_t", .when(platforms: [.macOS, .iOS])),
-            .unsafeFlags(["-Wno-module-import-in-extern-c"]),
             .unsafeFlags(["-fsigned-char"], .when(platforms: [.android])),
             .unsafeFlags(["-fno-objc-arc"], .when(platforms: [.macOS, .iOS]))
         ],
