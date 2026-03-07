@@ -7,7 +7,7 @@ mkdir -p .build-ios/reports
 # Test
 MANIFEST_TARGET_PLATFORM=iOS \
   xcodebuild test -scheme MailCore \
-  -destination "OS=17.5,name=iPhone 15" \
+  -destination "OS=26.2,name=iPhone 17" \
   -derivedDataPath ./.build-ios | tee .build-ios/reports/test.log
 return_code=${PIPESTATUS[0]}
 
