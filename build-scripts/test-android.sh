@@ -3,31 +3,17 @@
 set -ex
 
 # Create variables
-export SWIFT_ANDROID_HOME=$SWIFT_ANDROID_HOME_6_0_3
-export SWIFT_ANDROID_API_LEVEL=26
-export ANDROID_NDK=$ANDROID_NDK_ROOT_26C
-export ANDROID_NDK_ROOT=$ANDROID_NDK
-export ANDROID_NDK_HOME=$ANDROID_NDK
-
-# Update PATH
-export PATH=$ANDROID_NDK:$PATH
-export PATH=$SWIFT_ANDROID_HOME/build-tools:$PATH
+export SWIFT_ANDROID_API_LEVEL=29
 
 # Emulator
 export BUILD_ANDROID=1
 export EMULATOR_PORT=5558
-export EMULATOR_SDK_VERSION=34
+export EMULATOR_SDK_VERSION=36
 export EMULATOR_NAME=ci-test-$EMULATOR_SDK_VERSION-$EMULATOR_PORT
 export ANDROID_SERIAL=emulator-$EMULATOR_PORT
-if [[ $(uname -m) == 'arm64' ]]; then
-  export SWIFT_ANDROID_ARCH=aarch64
-  export EMULATOR_ARCH=arm64-v8a
-else
-  export SWIFT_ANDROID_ARCH=x86_64
-  export EMULATOR_ARCH=x86_64
-fi
-export EMULATOR_PACKAGE="system-images;android-$EMULATOR_SDK_VERSION;aosp_atd;$EMULATOR_ARCH"
-export EMULATOR_ABI=aosp_atd/$EMULATOR_ARCH
+export EMULATOR_ARCH=arm64-v8a
+export EMULATOR_PACKAGE="system-images;android-$EMULATOR_SDK_VERSION;google_apis;$EMULATOR_ARCH"
+export EMULATOR_ABI=google_apis/$EMULATOR_ARCH
 
 function finish {
   exit_code=$?
@@ -66,10 +52,10 @@ mkdir -p .build/reports
 mkdir -p .build/debug
 adb logcat | ndk-stack -sym .build/debug > .build/reports/ndk-stack.log &
 
-swift android test --deploy -Xbuild -Xcc -Xbuild -DUNIT_TESTS
+swift-android test --deploy -Xbuild -Xcc -Xbuild -DUNIT_TESTS
 
 # Test
-swift android test --just-run | tee .build/reports/test.log
+swift-android test --just-run --isolate | tee .build/reports/test.log
 return_code=${PIPESTATUS[0]}
 
 cat .build/reports/test.log | xcbeautify --report junit --report-path .build/reports
