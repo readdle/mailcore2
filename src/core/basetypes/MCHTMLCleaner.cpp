@@ -17,12 +17,7 @@ typedef unsigned long ulong;
 
 #include <tidy/tidy.h>
 
-#if SWIFT_PACKAGE
-// Druk: in Andorid/iOS/macOS we use modern Tidy (buffio.h -> tidybuffio.h)
 #include <tidy/tidybuffio.h>
-#else
-#include <tidy/buffio.h>
-#endif
 
 #include "MCUtils.h"
 #include "MCLog.h"
