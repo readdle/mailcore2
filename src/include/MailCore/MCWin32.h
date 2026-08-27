@@ -21,6 +21,9 @@
 #include <sys/stat.h>
 #include <errno.h>
 #include <direct.h>
+// io.h declares POSIX-compat unlink; must come before the macros below (DSK-658)
+#include <io.h>
+#include <wchar.h>
 
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
