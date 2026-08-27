@@ -29,8 +29,11 @@
 #define strcasestr mailcore::win32_strcasestr
 #define strdup _strdup
 #define fileno _fileno
-#define unlink _unlink
-#define mkdir _mkdir
+// DSK-658: paths are UTF-8; narrow CRT calls read them via the ANSI codepage
+// and fail on non-ANSI paths, so route them through wide-char wrappers.
+#define unlink mailcore::win32_unlink
+#define mkdir mailcore::win32_mkdir
+#define stat(path, buffer) mailcore::win32_stat(path, buffer)
 #define fopen mailcore::win32_fopen
 #define gmtime_r mailcore::win32_gmtime_r
 #define localtime_r mailcore::win32_localtime_r
@@ -67,6 +70,9 @@ namespace mailcore {
     int win32_gettimeofday(struct timeval * tp, struct timezone * tzp);
     
     FILE * win32_fopen(const char * filename, const char * mode);
+    int win32_unlink(const char * path);
+    int win32_mkdir(const char * path);
+    int win32_stat(const char * path, struct stat * buffer);
     int win32_vasprintf(char **strp, const char *fmt, va_list ap);
     int win32_snprintf(char * str, size_t size, const char * format, ...);
 
