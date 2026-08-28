@@ -6,6 +6,8 @@
 //  Copyright (c) 2013 MailCore. All rights reserved.
 //
 
+#include "MCWin32.h" // should be first include.
+
 #include "MCCertificateUtils.h"
 
 #if __APPLE__

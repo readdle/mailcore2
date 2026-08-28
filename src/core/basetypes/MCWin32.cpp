@@ -1,7 +1,29 @@
 #include "MCWin32.h"
 #include <io.h>
+#include <wchar.h>
 
-FILE * mailcore::win32_fopen(const char * filename, const char * mode)
+// DSK-658: caller frees. Returns NULL when the input is not valid UTF-8.
+static wchar_t * win32_path_to_wide(const char * path)
+{
+    if (path == NULL) {
+        return NULL;
+    }
+    int count = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, -1, NULL, 0);
+    if (count <= 0) {
+        return NULL;
+    }
+    wchar_t * widePath = (wchar_t *) malloc(count * sizeof(* widePath));
+    if (widePath == NULL) {
+        return NULL;
+    }
+    if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, -1, widePath, count) <= 0) {
+        free(widePath);
+        return NULL;
+    }
+    return widePath;
+}
+
+static FILE * win32_fopen_narrow(const char * filename, const char * mode)
 {
     FILE * f = NULL;
     int r = fopen_s(&f, filename, mode);
@@ -9,6 +31,68 @@ FILE * mailcore::win32_fopen(const char * filename, const char * mode)
         return NULL;
     }
     return f;
+}
+
+FILE * mailcore::win32_fopen(const char * filename, const char * mode)
+{
+    if (mode == NULL) {
+        return win32_fopen_narrow(filename, mode);
+    }
+    size_t modeLength = strlen(mode);
+    wchar_t wideMode[16];
+    if (modeLength >= sizeof(wideMode) / sizeof(wideMode[0])) {
+        return win32_fopen_narrow(filename, mode);
+    }
+    wchar_t * wideFilename = win32_path_to_wide(filename);
+    if (wideFilename == NULL) {
+        return win32_fopen_narrow(filename, mode);
+    }
+    // mode is ASCII by contract, widen it char-by-char
+    for (size_t i = 0; i <= modeLength; i++) {
+        wideMode[i] = (wchar_t) (unsigned char) mode[i];
+    }
+    FILE * f = NULL;
+    errno_t r = _wfopen_s(&f, wideFilename, wideMode);
+    free(wideFilename);
+    if (r != 0) {
+        return NULL;
+    }
+    return f;
+}
+
+int mailcore::win32_unlink(const char * path)
+{
+    wchar_t * widePath = win32_path_to_wide(path);
+    if (widePath == NULL) {
+        return _unlink(path);
+    }
+    int r = _wunlink(widePath);
+    free(widePath);
+    return r;
+}
+
+int mailcore::win32_mkdir(const char * path)
+{
+    wchar_t * widePath = win32_path_to_wide(path);
+    if (widePath == NULL) {
+        return _mkdir(path);
+    }
+    int r = _wmkdir(widePath);
+    free(widePath);
+    return r;
+}
+
+int mailcore::win32_stat(const char * path, struct stat * buffer)
+{
+    // struct stat is struct _stat64i32 in the UCRT unless _USE_32BIT_TIME_T is set
+    static_assert(sizeof(struct stat) == sizeof(struct _stat64i32), "unexpected struct stat layout");
+    wchar_t * widePath = win32_path_to_wide(path);
+    if (widePath == NULL) {
+        return _stat64i32(path, (struct _stat64i32 *) buffer);
+    }
+    int r = _wstat64i32(widePath, (struct _stat64i32 *) buffer);
+    free(widePath);
+    return r;
 }
 
 static const unsigned __int64 epoch = ((unsigned __int64)116444736000000000ULL);

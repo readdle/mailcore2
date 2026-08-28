@@ -1,3 +1,5 @@
+#include "MCWin32.h" // should be first include.
+
 #include "MCDataStreamDecoder.h"
 
 #include "MCString.h"
