@@ -14,6 +14,7 @@
 #include <MailCore/CAbstractMessageRendererCallback.h>
 
 #include <MailCore/CIMAPAsyncSession.h>
+#include <MailCore/CIMAPAsyncConnection.h>
 #include <MailCore/COperation.h>
 #include <MailCore/CIMAPBaseOperation.h>
 #include <MailCore/CIMAPIdleOperation.h>

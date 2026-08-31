@@ -53,7 +53,9 @@ namespace mailcore {
          Teardown of this connection only - it is left unusable and reconnects on next use, so call
          it for a command that is being abandoned (cancelled, or given up on), never to hurry up a
          command whose result still matters.
-         Returns whether a command was actually interrupted. */
+         Returns whether this operation was the one the queue was running at that moment. That may
+         include a command that finished just as the interrupt landed: its result is intact, but
+         the stream is cancelled all the same. */
         virtual bool interruptCurrentCommand();
         
         virtual void start();

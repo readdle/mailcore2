@@ -112,6 +112,8 @@ IMAPAsyncConnection::IMAPAsyncConnection()
     mAutomaticConfigurationEnabled = true;
     mQueueRunning = false;
     mScheduledAutomaticDisconnect = false;
+    mReserved = false;
+    mAutomaticDisconnectDelay = 30;
 }
 
 IMAPAsyncConnection::~IMAPAsyncConnection()
@@ -291,6 +293,26 @@ void IMAPAsyncConnection::cancelAllOperations()
     mQueue->cancelAllOperations();
 }
 
+void IMAPAsyncConnection::setReserved(bool reserved)
+{
+    mReserved = reserved;
+}
+
+bool IMAPAsyncConnection::isReserved()
+{
+    return mReserved;
+}
+
+void IMAPAsyncConnection::setAutomaticDisconnectDelay(time_t delay)
+{
+    mAutomaticDisconnectDelay = delay;
+}
+
+time_t IMAPAsyncConnection::automaticDisconnectDelay()
+{
+    return mAutomaticDisconnectDelay;
+}
+
 bool IMAPAsyncConnection::interruptCurrentCommand(IMAPOperation * operation)
 {
     // Only for the operation the queue is executing right now - its command is the one holding this
@@ -336,9 +358,9 @@ void IMAPAsyncConnection::tryAutomaticDisconnect()
     mOwner->retain();
     mScheduledAutomaticDisconnect = true;
 #if MC_HAS_GCD
-    performMethodOnDispatchQueueAfterDelay((Object::Method) &IMAPAsyncConnection::tryAutomaticDisconnectAfterDelay, NULL, dispatchQueue(), 30);
+    performMethodOnDispatchQueueAfterDelay((Object::Method) &IMAPAsyncConnection::tryAutomaticDisconnectAfterDelay, NULL, dispatchQueue(), (double) mAutomaticDisconnectDelay);
 #else
-    performMethodAfterDelay((Object::Method) &IMAPAsyncConnection::tryAutomaticDisconnectAfterDelay, NULL, 30);
+    performMethodAfterDelay((Object::Method) &IMAPAsyncConnection::tryAutomaticDisconnectAfterDelay, NULL, (double) mAutomaticDisconnectDelay);
 #endif
 
     if (scheduledAutomaticDisconnect) {
@@ -349,6 +371,14 @@ void IMAPAsyncConnection::tryAutomaticDisconnect()
 void IMAPAsyncConnection::tryAutomaticDisconnectAfterDelay(void * context)
 {
     mScheduledAutomaticDisconnect = false;
+
+    if (mReserved) {
+        // A lease holder is between commands. Leave its connection alone and check again after
+        // the next delay: the timer keeps deferring until the connection is released.
+        tryAutomaticDisconnect();
+        mOwner->release();
+        return;
+    }
 
     IMAPOperation * op = disconnectOperation();
     op->start();

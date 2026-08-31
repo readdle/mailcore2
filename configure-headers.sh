@@ -219,6 +219,7 @@ cp c/smtp/CSMTPSession.h ./include/MailCore
 
 cp c/imap/CIMAPAppendMessageOperation.h ./include/MailCore
 cp c/imap/CIMAPAsyncSession.h ./include/MailCore
+cp c/imap/CIMAPAsyncConnection.h ./include/MailCore
 cp c/imap/CIMAPBaseOperation.h ./include/MailCore
 cp c/imap/CIMAPCapabilityOperation.h ./include/MailCore
 cp c/imap/CIMAPCheckAccountOperation.h ./include/MailCore

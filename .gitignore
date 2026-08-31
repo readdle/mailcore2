@@ -60,3 +60,7 @@ test.log
 junit.xml
 .build-ios
 ndk-stack.log
+
+# SwiftPM local state
+Package.resolved
+.swiftpm/
