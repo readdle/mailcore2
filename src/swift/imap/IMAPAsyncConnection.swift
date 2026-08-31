@@ -8,7 +8,9 @@ import CMailCore
  While held, the session's regular per-operation connection selection skips this connection, so
  the only commands running on it are those explicitly pointed at it with
  MCOIMAPBaseOperation.setConnection(_:). Hand it back with
- MCOIMAPSession.releaseConnection(_:disconnect:) - a leaked lease permanently shrinks the pool.
+ MCOIMAPSession.releaseConnection(_:disconnect:) - a leaked lease permanently degrades the
+ pool: the connection is never handed out exclusively again and, at the limit, falls back to
+ being shared.
  */
 public class MCOIMAPAsyncConnection: NSObjectCompat {
 

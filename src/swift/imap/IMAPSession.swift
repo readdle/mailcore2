@@ -166,7 +166,8 @@ public class MCOIMAPSession: NSObjectCompat {
      reserved, regular operations share the least busy reserved connection, so size
      maximumConnections against the number of simultaneous leases. Every acquired connection
      must be handed back with releaseConnection(_:disconnect:): a leaked lease permanently
-     shrinks the pool.
+     degrades the pool — the connection is never handed out exclusively again and, at the
+     limit, falls back to being shared.
 
      Reservation state is as unsynchronized as the rest of the session's connection selection:
      call acquireConnection/releaseConnection on the session's dispatchQueue (where operations
