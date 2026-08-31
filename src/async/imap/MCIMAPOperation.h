@@ -43,6 +43,18 @@ namespace mailcore {
         
         virtual void beforeMain();
         virtual void afterMain();
+        virtual void interrupt();
+
+        /** Aborts this operation's IMAP command if it is the one currently running on its
+         connection: the blocked read returns at once instead of waiting out the socket timeout, so
+         the operations queued behind it (a disconnect, most importantly) run immediately.
+         Does nothing when the operation is not the one running.
+
+         Teardown of this connection only - it is left unusable and reconnects on next use, so call
+         it for a command that is being abandoned (cancelled, or given up on), never to hurry up a
+         command whose result still matters.
+         Returns whether a command was actually interrupted. */
+        virtual bool interruptCurrentCommand();
         
         virtual void start();
         

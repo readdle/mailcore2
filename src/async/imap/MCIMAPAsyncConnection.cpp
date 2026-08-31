@@ -291,6 +291,18 @@ void IMAPAsyncConnection::cancelAllOperations()
     mQueue->cancelAllOperations();
 }
 
+bool IMAPAsyncConnection::interruptCurrentCommand(IMAPOperation * operation)
+{
+    // Only for the operation the queue is executing right now - its command is the one holding this
+    // connection. A queued operation holds nothing yet, and one that has already finished no longer
+    // owns the stream, so cancelling on its behalf would cut somebody else's command. The queue
+    // settles that question and interrupts under its own lock.
+    //
+    // Deliberately not scheduled through mQueue as an operation: the point is to unblock the
+    // operation the queue is running, and a queued request would wait behind that very operation.
+    return mQueue->interruptRunningOperation(operation);
+}
+
 void IMAPAsyncConnection::runOperation(IMAPOperation * operation)
 {
     if (mScheduledAutomaticDisconnect) {
