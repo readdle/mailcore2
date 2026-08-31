@@ -32,4 +32,16 @@ public class MCOIMAPAsyncConnection: NSObjectCompat {
     public var operationsCount: UInt32 {
         return connection.operationsCount
     }
+
+    /**
+     Returns an operation that disconnects this connection only: the object stays pooled (and
+     leased, if it is), and the next command on it logs in from scratch. With a lease on a
+     server that pins the mailbox view per connection, this is how the holder forces a view no
+     older than itself — start it before the commands whose freshness matters.
+     */
+    public func disconnectOperation() -> MCOIMAPOperation {
+        return mailCoreAutoreleasePool {
+            return MCOIMAPOperation(operation: connection.disconnectOperation())
+        }
+    }
 }

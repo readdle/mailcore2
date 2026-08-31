@@ -307,6 +307,35 @@ final class IMAPConnectionLeaseTests: XCTestCase {
                            "A repeated release must not tear down a pooled connection")
         }
     }
+
+    func testConnectionScopedDisconnectTearsTheSocketButKeepsTheLease() throws {
+        let endpoint = try SilentTCPEndpoint(greeting: "* OK [CAPABILITY IMAP4rev1] SilentTCPEndpoint ready\r\n")
+        defer { endpoint.stop() }
+
+        let session = makeSession(port: endpoint.port, maximumConnections: 1)
+
+        guard let leased = session.acquireConnection(folder: nil) else {
+            return XCTFail("An empty pool with room for 1 connection must satisfy the lease")
+        }
+
+        runOffMainThread(timeout: 30) {
+            let operation = session.connectOperation()
+            operation.setConnection(leased)
+            let finished = self.start(operation)
+            XCTAssertEqual(finished.wait(timeout: .now() + 5), .success,
+                           "The greeting endpoint was expected to let the connect finish")
+
+            let disconnect = self.start(leased.disconnectOperation())
+            XCTAssertEqual(disconnect.wait(timeout: .now() + 5), .success)
+
+            XCTAssertTrue(endpoint.waitForClientDisconnect(timeout: 5),
+                          "The connection-scoped disconnect was expected to close the socket")
+            XCTAssertTrue(leased.isReserved,
+                          "Refreshing tears the socket, not the lease")
+
+            session.releaseConnection(leased, disconnect: false)
+        }
+    }
 }
 
 #endif
