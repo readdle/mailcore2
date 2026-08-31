@@ -328,14 +328,19 @@ IMAPAsyncConnection * IMAPAsyncSession::sessionForFolder(String * folder, bool u
             // empty queue or create new one, if maximum connections limit does not reached.
             s = availableSession();
             if (s != NULL && s->operationsCount() == 0) {
-                s->setLastFolder(folder);
+                if (!s->isReserved()) {
+                    s->setLastFolder(folder);
+                }
                 return s;
             }
         }
 
         // otherwise returns session with minimum size of queue among selected to the folder.
+        // A reserved result (the all-reserved fallback) keeps its affinity hint: it belongs to
+        // the lease holder, and an acquireConnection call that lands here runs no operation at
+        // all - stamping the hint would desync it from the actually selected mailbox.
         s = matchingSessionForFolder(folder);
-        if (s != NULL) {
+        if (s != NULL && !s->isReserved()) {
             s->setLastFolder(folder);
         }
         return s;
@@ -440,14 +445,23 @@ IMAPAsyncConnection * IMAPAsyncSession::acquireConnection(String * folder)
 
 void IMAPAsyncSession::releaseConnection(IMAPAsyncConnection * connection, bool disconnect)
 {
-    if (connection == NULL) {
+    if (connection == NULL || !connection->isReserved() || connection->owner() != this) {
+        // Idempotent by contract: a second release would enqueue its disconnect on a
+        // connection that is back in the shared pool and may be serving other operations.
         return;
     }
     if (disconnect) {
         // queued while still reserved, so no newcomer lands ahead of the disconnect
         connection->disconnectOperation()->start();
+        connection->setReserved(false);
     }
-    connection->setReserved(false);
+    else {
+        connection->setReserved(false);
+        // The idle timer died if it fired during the lease; arm it anew so a pooled connection
+        // nobody picks up still goes away. On the disconnect path the drain after the
+        // disconnect operation re-arms it the regular way.
+        connection->tryAutomaticDisconnect();
+    }
 }
 
 IMAPFolderInfoOperation * IMAPAsyncSession::folderInfoOperation(String * folder)

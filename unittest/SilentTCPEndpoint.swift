@@ -107,17 +107,29 @@ final class SilentTCPEndpoint {
 
             if let greeting = greeting {
                 greeting.utf8CString.withUnsafeBufferPointer { buffer in
-                    // -1 for the terminating NUL of a CString
-                    _ = send(accepted, buffer.baseAddress, buffer.count - 1, 0)
+                    // -1 for the terminating NUL of a CString; loop out partial writes
+                    var sent = 0
+                    let total = buffer.count - 1
+                    while sent < total {
+                        let written = send(accepted, buffer.baseAddress! + sent, total - sent, 0)
+                        guard written > 0 else {
+                            return
+                        }
+                        sent += written
+                    }
                 }
             }
 
             // Incoming commands are read and discarded - never answered - so EOF, i.e. the client
-            // closing its socket, is the only thing this loop reports.
+            // closing its socket, is the only thing this loop reports. The reader owns the
+            // descriptor: closing it from stop() while recv() blocks on it would let the fd
+            // number be reused and the loop read somebody else's descriptor; stop() only
+            // shuts the socket down, which wakes recv(), and the close happens here.
             DispatchQueue.global().async { [weak self] in
                 var buffer = [UInt8](repeating: 0, count: 1024)
                 while recv(accepted, &buffer, buffer.count, 0) > 0 {
                 }
+                Darwin.close(accepted)
                 guard let self = self else {
                     return
                 }
@@ -155,9 +167,13 @@ final class SilentTCPEndpoint {
         acceptedSockets = []
         lock.unlock()
 
+        // shutdown() wakes the blocked accept()/recv() calls without invalidating the fd
+        // numbers under them; each descriptor is then closed by the thread that owns it
+        // (accepted sockets by their readers, the listening one right here after the wakeup).
+        shutdown(listeningSocket, SHUT_RDWR)
         Darwin.close(listeningSocket)
         for accepted in sockets {
-            Darwin.close(accepted)
+            shutdown(accepted, SHUT_RDWR)
         }
     }
 }

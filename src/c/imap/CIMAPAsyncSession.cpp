@@ -89,10 +89,6 @@ C_SYNTHESIZE_FUNC_WITH_SCALAR(bool, isIdleEnabled)
 C_SYNTHESIZE_FUNC_WITH_SCALAR(bool, isOperationQueueRunning)
 C_SYNTHESIZE_FUNC_WITH_VOID(cancelAllOperations)
 C_SYNTHESIZE_FUNC_WITH_OBJ(CIMAPAsyncConnection, acquireConnection, MailCoreString)
-
-void CIMAPAsyncSession_releaseConnection(struct CIMAPAsyncSession self, CIMAPAsyncConnection connection, bool disconnect) {
-    self.instance->releaseConnection(connection.instance, disconnect);
-}
 C_SYNTHESIZE_FUNC_WITH_OBJ(CIMAPBaseOperation, subscribeFolderOperation, MailCoreString)
 C_SYNTHESIZE_FUNC_WITH_OBJ(CIMAPBaseOperation, unsubscribeFolderOperation, MailCoreString)
 C_SYNTHESIZE_FUNC_WITH_OBJ(CIMAPBaseOperation, renameFolderOperation, MailCoreString, MailCoreString)
@@ -106,6 +102,10 @@ CIMAPFetchContentToFileOperation CIMAPAsyncSession_fetchMessageAttachmentToFileO
 
 CIMAPCustomCommandOperation CIMAPAsyncSession_customCommandOperation(struct CIMAPAsyncSession self, MailCoreString command) {
     return CIMAPCustomCommandOperation_new(self.instance->customCommand(command.instance, false));
+}
+
+void CIMAPAsyncSession_releaseConnection(struct CIMAPAsyncSession self, CIMAPAsyncConnection connection, bool disconnect) {
+    self.instance->releaseConnection(connection.instance, disconnect);
 }
 
 C_SYNTHESIZE_FUNC_WITH_OBJ(CIMAPBaseOperation, connectOperation)

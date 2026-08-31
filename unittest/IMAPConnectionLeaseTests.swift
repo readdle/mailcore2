@@ -226,7 +226,7 @@ final class IMAPConnectionLeaseTests: XCTestCase {
 
     /// Also exercises the session -> connection plumbing of automaticDisconnectDelay: with the
     /// default 30s the timer could not fire inside the observation windows at all.
-    func testAutomaticDisconnectDefersWhileReservedAndFiresAfterRelease() throws {
+    func testAutomaticDisconnectStandsDownWhileReservedAndReleaseRearmsIt() throws {
         let endpoint = try SilentTCPEndpoint(greeting: "* OK [CAPABILITY IMAP4rev1] SilentTCPEndpoint ready\r\n")
         defer { endpoint.stop() }
 
@@ -245,15 +245,15 @@ final class IMAPConnectionLeaseTests: XCTestCase {
                            "The greeting endpoint was expected to let the connect finish")
 
             // The queue has drained, so the 1s idle timer is armed. Reserved, the connection
-            // must survive several timer periods.
+            // must survive well past the timer period: the timer stands down instead of firing.
             XCTAssertFalse(endpoint.waitForClientDisconnect(timeout: 2.5),
-                           "The idle auto-disconnect must defer while the connection is reserved")
+                           "The idle auto-disconnect must stand down while the connection is reserved")
 
             session.releaseConnection(leased, disconnect: false)
 
-            // Released, the deferred timer finally fires and closes the socket.
+            // Release re-arms the idle timer, which then closes the pooled socket.
             XCTAssertTrue(endpoint.waitForClientDisconnect(timeout: 5),
-                          "After release the deferred auto-disconnect was expected to fire")
+                          "After release the re-armed auto-disconnect was expected to fire")
         }
     }
 
@@ -278,6 +278,33 @@ final class IMAPConnectionLeaseTests: XCTestCase {
             XCTAssertFalse(leased.isReserved)
             XCTAssertTrue(endpoint.waitForClientDisconnect(timeout: 5),
                           "Release with disconnect was expected to close the socket")
+        }
+    }
+
+    func testReleaseIsIdempotent() throws {
+        let endpoint = try SilentTCPEndpoint(greeting: "* OK [CAPABILITY IMAP4rev1] SilentTCPEndpoint ready\r\n")
+        defer { endpoint.stop() }
+
+        let session = makeSession(port: endpoint.port, maximumConnections: 1)
+
+        guard let leased = session.acquireConnection(folder: nil) else {
+            return XCTFail("An empty pool with room for 1 connection must satisfy the lease")
+        }
+
+        runOffMainThread(timeout: 30) {
+            let operation = session.connectOperation()
+            operation.setConnection(leased)
+            let finished = self.start(operation)
+            XCTAssertEqual(finished.wait(timeout: .now() + 5), .success,
+                           "The greeting endpoint was expected to let the connect finish")
+
+            session.releaseConnection(leased, disconnect: false)
+            // The second release must be a no-op: its disconnect would otherwise land on a
+            // connection that is back in the shared pool and may serve other operations.
+            session.releaseConnection(leased, disconnect: true)
+
+            XCTAssertFalse(endpoint.waitForClientDisconnect(timeout: 2),
+                           "A repeated release must not tear down a pooled connection")
         }
     }
 }

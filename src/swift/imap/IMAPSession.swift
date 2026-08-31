@@ -156,10 +156,10 @@ public class MCOIMAPSession: NSObjectCompat {
     /**
      Reserves one connection of the pool for exclusive use: the regular per-operation selection
      stops seeing it, so new commands run on it only when explicitly pointed at it with
-     MCOIMAPBaseOperation.setConnection(_:), and the idle auto-disconnect defers instead of
-     firing. Exclusivity is forward-only: operations already queued on the connection still run
-     ahead of the lease holder's (selection prefers an idle or new connection, so a backlog is
-     only possible with the pool at its limit).
+     MCOIMAPBaseOperation.setConnection(_:), and the idle auto-disconnect stands down until
+     release. Exclusivity is forward-only: operations already queued on the connection still
+     run ahead of the lease holder's (selection prefers an idle or new connection, so a backlog
+     is only possible with the pool at its limit).
 
      Returns nil when every connection is already reserved - callers must then fall back to the
      shared pool. The reverse degradation exists too: while the pool is at its limit and fully
@@ -167,6 +167,10 @@ public class MCOIMAPSession: NSObjectCompat {
      maximumConnections against the number of simultaneous leases. Every acquired connection
      must be handed back with releaseConnection(_:disconnect:): a leaked lease permanently
      shrinks the pool.
+
+     Reservation state is as unsynchronized as the rest of the session's connection selection:
+     call acquireConnection/releaseConnection on the session's dispatchQueue (where operations
+     start), or serialize them with it externally.
      */
     public func acquireConnection(folder: String?) -> MCOIMAPAsyncConnection? {
         return mailCoreAutoreleasePool {
@@ -179,11 +183,13 @@ public class MCOIMAPSession: NSObjectCompat {
     }
 
     /**
-     Returns an acquired connection to the shared pool.
+     Returns an acquired connection to the shared pool and re-arms its idle auto-disconnect.
 
      With disconnect, the socket is torn down first (the connection object stays pooled and
      reconnects on next use) - for servers that pin a mailbox snapshot per connection, and
      mandatory after interruptCurrentCommand(), since a cancelled stream does not recover.
+     Idempotent: releasing a connection that is not reserved does nothing. Same threading
+     contract as acquireConnection(folder:).
      */
     public func releaseConnection(_ connection: MCOIMAPAsyncConnection, disconnect: Bool) {
         mailCoreAutoreleasePool {

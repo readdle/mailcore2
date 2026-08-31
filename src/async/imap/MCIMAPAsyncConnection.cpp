@@ -341,7 +341,10 @@ void IMAPAsyncConnection::runOperation(IMAPOperation * operation)
 
 void IMAPAsyncConnection::tryAutomaticDisconnect()
 {
-    // It's safe since no thread is running when this function is called.
+    // Called when the operation queue drains (queue callback) and from
+    // IMAPAsyncSession::releaseConnection - both on the session's dispatch queue in the
+    // supported usage, like the rest of the timer bookkeeping. No queue thread is running a
+    // command at either point.
     if (mSession->isDisconnected()) {
         return;
     }
@@ -373,9 +376,10 @@ void IMAPAsyncConnection::tryAutomaticDisconnectAfterDelay(void * context)
     mScheduledAutomaticDisconnect = false;
 
     if (mReserved) {
-        // A lease holder is between commands. Leave its connection alone and check again after
-        // the next delay: the timer keeps deferring until the connection is released.
-        tryAutomaticDisconnect();
+        // A lease holder is between commands: leave its connection alone and let the timer
+        // die. Re-arming here instead would keep an owner retain and a periodic wakeup alive
+        // for as long as the lease is held - forever, if the lease leaks. releaseConnection
+        // arms the timer anew when the connection returns to the pool.
         mOwner->release();
         return;
     }

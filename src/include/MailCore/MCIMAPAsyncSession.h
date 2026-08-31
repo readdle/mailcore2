@@ -101,18 +101,23 @@ namespace mailcore {
 
         /*! Reserves a connection for exclusive use: the regular per-operation selection stops
          seeing it, so only operations explicitly pointed at it (IMAPOperation::setSession) run
-         there, and the idle auto-disconnect defers instead of firing. Exclusivity is
+         there, and the idle auto-disconnect stands down until release. Exclusivity is
          forward-only: operations already queued on the connection still run ahead of the lease
          holder's (selection prefers an idle or new connection, so a backlog is only possible
          with the pool at its limit). Returns NULL when every connection is already reserved -
          the pool has nothing left to hand out exclusively. While the pool is at its limit and
          fully reserved, regular operations fall back to sharing the least busy reserved
-         connection, so size maximumConnections against the number of simultaneous leases. */
+         connection, so size maximumConnections against the number of simultaneous leases.
+         Reservation state is as unsynchronized as the rest of the session selection: call
+         acquireConnection/releaseConnection on the session's dispatch queue (where operations
+         start), or serialize them with it externally. */
         virtual IMAPAsyncConnection * acquireConnection(String * folder);
-        /*! Returns a reserved connection to the shared pool. With disconnect, tears the socket
-         down first (the connection object stays pooled and reconnects on next use) - for
-         servers that pin a mailbox snapshot per connection, and mandatory after
-         interruptCurrentCommand, since a cancelled stream does not recover. */
+        /*! Returns a reserved connection to the shared pool and re-arms its idle
+         auto-disconnect. With disconnect, tears the socket down first (the connection object
+         stays pooled and reconnects on next use) - for servers that pin a mailbox snapshot per
+         connection, and mandatory after interruptCurrentCommand, since a cancelled stream does
+         not recover. Idempotent: releasing a connection that is not reserved does nothing.
+         Same threading contract as acquireConnection. */
         virtual void releaseConnection(IMAPAsyncConnection * connection, bool disconnect);
         
         virtual void setConnectionLogger(ConnectionLogger * logger);
