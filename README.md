@@ -34,10 +34,27 @@ Read [instructions for Linux](https://github.com/MailCore/mailcore2/blob/master/
 Windows builds of spark-core do **not** compile mailcore2 C++ from source.
 `Build-SparkCore.ps1` clones this repo at a pinned tag and runs
 `build-windows-5.10\Build-SwiftMailcore.ps1`, which compiles only the Swift
-bindings (`src/swift`) and downloads the prebuilt C++ libraries from S3
-(`Get-Mailcore2.ps1`, `mailcore2-all-<N>.zip`). **Any C++ change reaches
-Windows only through a new prebuilt archive** — merging a PR or moving a tag
-is not enough.
+bindings (`src/swift`) and downloads the prebuilt C++ libraries
+(`Get-Mailcore2.ps1`). **Any C++ change reaches Windows only through a new
+prebuilt archive** — merging a PR or moving a tag is not enough.
+
+The archive is a **release asset of this repository**, named after a digest of
+the sources it was built from:
+
+```text
+mailcore2-windows-<digest>.zip
+```
+
+It used to be `mailcore2-all-<N>.zip` in the `spark-prebuilt-binaries` S3
+bucket, behind `SPARK_PREBUILT_KEY`, with the version bumped by hand inside the
+shipped tag. Nothing about the build changed — only where the archive lives and
+how it is named. Two things follow:
+
+- **Nothing to bump.** The digest covers `src` (without `src/swift`),
+  `CMakeLists.txt` and `build-windows-5.10`, so a checkout already knows which
+  archive it needs. A change that touches none of those reuses the published one.
+- **A missing archive cannot pass silently.** The `mailcore2 - Windows prebuilt`
+  pull-request check says so before the spark-core build ever runs.
 
 ### Prerequisites ###
 
@@ -60,69 +77,86 @@ easiest path. On a bare machine you need:
   dispatch/BlocksRuntime).
 - ICU 69.1 at `C:\Library\icu-69.1\usr`, libxml2 2.11.5 at
   `C:\Library\libxml2-2.11.5\usr` (paths are hardcoded in the script).
-- `SPARK_PREBUILT_KEY` env var — download token for
-  `spark-prebuilt-binaries.s3.amazonaws.com` (zlib/sasl/openssl prebuilts).
 - ssh access to `git@github.com:readdle/{ctemplate,libetpan,tidy-html5}`.
+
+`SPARK_PREBUILT_KEY` is no longer needed: zlib/sasl/openssl come from a public
+release asset. Publishing additionally needs the GitHub CLI, authenticated as a
+user with write access — that one cannot be baked into the image:
+
+```powershell
+gh auth login
+```
 
 ### Build ###
 
 ```powershell
-$env:SPARK_PREBUILT_KEY = "<key>"
 powershell -ExecutionPolicy Bypass -File .\build-windows-5.10\Build-Mailcore2.ps1 -Install
 ```
 
 The script clones and builds ctemplate/libetpan/tidy, downloads the binary
-deps, then builds mailcore2/CMailCore with CMake + Ninja using `clang-cl`
-from the Swift toolchain. `-Install` lays the result out in `.build\install`
+deps (openssl/sasl/zlib, now from the release instead of S3), then builds
+mailcore2/CMailCore with CMake + Ninja using `clang-cl` from the Swift
+toolchain. `-Install` lays the result out in `.build\install`
 (`bin`, `include`, `lib`, `etc`).
 
 - After a **failed** run, delete `.build` before retrying — stale CMake
   caches keep the old configuration (wrong install prefix, wrong build type)
-  and produce confusing errors.
+  and produce confusing errors. `Publish-Mailcore2Prebuilt.ps1` does this for
+  you; a direct run does not.
 - Verify what was built: `type .build\install\etc\mailcore2-git-rev` must be
   the commit you intend to ship.
 
-### Package ###
+### Publish ###
 
-The zip must contain a single top-level folder named exactly `mailcore2-all`
-(that is the path `Get-Mailcore2.ps1` extracts):
-
-```powershell
-cd .\.build
-Copy-Item -Recurse install mailcore2-all
-tar -a -cf mailcore2-all-<N+1>.zip mailcore2-all
-```
-
-Sanity check against the current archive: `tar -tf` both files and compare
-the top-level layout.
-
-### Upload ###
-
-The bucket is `spark-prebuilt-binaries` in **eu-central-1**.
-`SPARK_PREBUILT_KEY` is a download-only token — uploads need real AWS
-credentials:
-
-```bash
-aws s3 cp mailcore2-all-<N+1>.zip s3://spark-prebuilt-binaries/mailcore2-all-<N+1>.zip --region eu-central-1
-```
-
-Verify the build can fetch it the same way the script does:
+Packaging and uploading are one command, run in a checkout **at the revision
+that needs the prebuilt**:
 
 ```powershell
-Invoke-RestMethod -Method Head -Uri "https://spark-prebuilt-binaries.s3.amazonaws.com/mailcore2-all-<N+1>.zip" -UserAgent $env:SPARK_PREBUILT_KEY
+.\build-windows-5.10\Publish-Mailcore2Prebuilt.ps1
 ```
 
-Never overwrite an existing `mailcore2-all-<N>.zip` — older tags keep
-downloading it by name.
+It computes the digest, exits early if that archive is already published,
+fetches the dependency archive, clears the previous build output, builds through
+`Build-Mailcore2.ps1`, stamps `etc/mailcore2-source-digest`, packages
+`mailcore2-all/`, verifies the package, and adds it to the
+[`windows-prebuilt`](https://github.com/readdle/mailcore2/releases/tag/windows-prebuilt)
+release. `-Force` rebuilds and replaces an archive that is already published;
+`-SkipUpload` stops after verifying.
+
+Nothing needs to be committed afterwards — the archive is named after the
+sources, so the revision that needs it finds it.
+
+The `windows-prebuilt` release is a permanent container for binaries, not a code
+release. It was created by hand, once, along with
+`mailcore2-windows-deps-1.zip`: openssl, sasl and zlib, the three binaries that
+used to come from S3, unchanged. No script creates the release or attaches that
+archive.
+
+Never delete a published `mailcore2-windows-<digest>.zip` — revisions built
+against it keep downloading it by name.
+
+### Pull request check ###
+
+`.github/workflows/pull-request-check.yml` runs
+[`build-windows-5.10/Check-PrebuiltPublished.ps1`](build-windows-5.10/Check-PrebuiltPublished.ps1)
+on every pull request. It builds nothing and needs no Windows: the digest is a
+hash of git tree entries, identical on every platform, so a Linux runner
+computes it in seconds and asks the release whether that archive is there.
+
+It checks the merge result, because that is what lands on the base branch and
+gets tagged. When the base has moved since you published, your branch head has
+an archive and the merge result does not — the check says so and tells you to
+rebase.
+
+Re-run it after publishing; nothing needs to be pushed for it to turn green. It
+is advisory until `mailcore2 - Windows prebuilt` is added to the branch
+protection rules for `spark2`.
 
 ### Switch builds to the new prebuilt ###
 
-1. In this repo: bump `$PrebuiltMailcoreVersion` in
-   `build-windows-5.10/Get-Mailcore2.ps1`, PR into `spark2`.
-2. Tag the merge with the next `2.1.x` tag. The bump **must be inside the
-   tag** — spark-core runs `Get-Mailcore2.ps1` from its mailcore checkout at
-   that tag, so a tag without the bump silently downloads the previous
-   archive.
+1. Publish the prebuilt for the revision you are shipping (above). There is no
+   version to bump and nothing to commit for it.
+2. Tag the merge with the next `2.1.x` tag.
 3. In `spark-core-mono`, update every mailcore pin to the new tag — the
    versions must match across platforms:
    - `spark-core/build-scripts/Windows-5.10/Build-SparkCore.ps1`
