@@ -1,8 +1,3 @@
-> **Superseded.** These are the pre-Swift-5.10 Visual Studio 2019 scripts, replaced in
-> December 2023 by the ones in `windows/`. They still expect the retired S3 bucket and the
-> `SPARK_PREBUILT_KEY` credential, so they no longer work. Kept only for reference; see the
-> Windows prebuilt section of the top-level [README](../../README.md) for the current flow.
-
 ## MailCore 2 on Windows ##
 
 All the provided binaries are compiled in release mode.

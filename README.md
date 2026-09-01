@@ -124,7 +124,6 @@ sources, so the revision that needs it finds it.
 | `Build-Helpers.ps1`, `Common.ps1` | Digest, archive naming, and stand-ins for the internal RD modules. |
 | `Check-PrebuiltPublished.ps1` | Asks whether these sources have a published archive. The pull-request check. |
 | `bin/`, `vs/`, `mailcore2/` | Redistributables and the Visual Studio project files. |
-| `legacy-vs2019/` | The superseded pre-Swift-5.10 scripts. Do not use; they still expect the retired S3 bucket. |
 
 ### Requirements ###
 
