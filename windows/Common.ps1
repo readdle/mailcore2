@@ -44,21 +44,28 @@ function Get-MailcoreDigestPathSpec {
 # this is instant and, more importantly, identical on every platform - core.autocrlf cannot
 # change it, unlike hashing working-tree content.
 function Get-MailcoreSourceDigest {
-    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        # Anything git resolves to a tree. Only HEAD can be checked for local edits, so only
+        # HEAD is; other refs are read straight out of the object store.
+        [string]$Ref = "HEAD"
+    )
 
     $paths = Get-MailcoreDigestPathSpec
 
-    # src/swift is outside the digest, so a dirty file there must not block the build either.
-    $status = @(& git -C $RepoRoot status --porcelain -- @paths | Where-Object { $_ -notmatch " src/swift/" })
-    if ($LASTEXITCODE -ne 0) { throw "Not a git checkout: $RepoRoot" }
-    if ($status) {
-        throw "Uncommitted changes under $($paths -join ', '): the digest describes HEAD, so it would not match what is built. Commit them, or build from source with -BuildMailcore2.`n$($status -join "`n")"
+    if ($Ref -eq "HEAD") {
+        # src/swift is outside the digest, so a dirty file there must not block the build either.
+        $status = @(& git -C $RepoRoot status --porcelain -- @paths | Where-Object { $_ -notmatch " src/swift/" })
+        if ($LASTEXITCODE -ne 0) { throw "Not a git checkout: $RepoRoot" }
+        if ($status) {
+            throw "Uncommitted changes under $($paths -join ', '): the digest describes HEAD, so it would not match what is built. Commit them, or build from source with -BuildMailcore2.`n$($status -join "`n")"
+        }
     }
 
-    $lines = & git -C $RepoRoot ls-tree -r HEAD -- @paths
-    if ($LASTEXITCODE -ne 0) { throw "git ls-tree failed in $RepoRoot" }
+    $lines = & git -C $RepoRoot ls-tree -r $Ref -- @paths
+    if ($LASTEXITCODE -ne 0) { throw "git ls-tree failed for $Ref in $RepoRoot" }
     $lines = $lines | Where-Object { $_ -notmatch "`tsrc/swift/" }
-    if (-not $lines) { throw "No source entries found in $RepoRoot - wrong directory?" }
+    if (-not $lines) { throw "No source entries found at $Ref in $RepoRoot - wrong directory?" }
 
     # Canonical listing: git's own order, LF endings, UTF-8 without BOM. Written to a file
     # rather than piped, because PowerShell re-encodes text between processes.
@@ -92,6 +99,21 @@ function Get-MailcoreArchiveDigest {
     $stamp = Join-Path $UnpackedPath "etc\mailcore2-source-digest"
     if (-not (Test-Path -LiteralPath $stamp)) { return $null }
     return (Get-Content -LiteralPath $stamp -Raw).Trim()
+}
+
+# --- The release ------------------------------------------------------------------------------
+
+# Names of every asset on the prebuilt release, or an empty array when there is no release yet.
+# Needs gh on PATH and authenticated (GH_TOKEN is enough in CI).
+function Get-MailcoreReleaseAssetNames {
+    $assets = & gh release view $Script:MailcorePrebuiltReleaseTag --repo $Script:MailcorePrebuiltRepo --json assets --jq ".assets[].name" 2>$null
+    if ($LASTEXITCODE -ne 0) { return @() }
+    return @($assets)
+}
+
+function Test-MailcoreReleaseAsset {
+    param([Parameter(Mandatory = $true)][string]$AssetName)
+    return ((Get-MailcoreReleaseAssetNames) -contains $AssetName)
 }
 
 # --- The dependency archive -------------------------------------------------------------------

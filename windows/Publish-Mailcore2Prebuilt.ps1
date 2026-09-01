@@ -32,13 +32,6 @@ function Assert-GitHubCli {
     }
 }
 
-function Test-ReleaseAsset {
-    param([Parameter(Mandatory = $true)][string]$AssetName)
-    $assets = & gh release view $Script:MailcorePrebuiltReleaseTag --repo $Script:MailcorePrebuiltRepo --json assets --jq ".assets[].name" 2>$null
-    if ($LASTEXITCODE -ne 0) { return $false }   # no release yet
-    return ($assets -contains $AssetName)
-}
-
 function Publish-ReleaseAsset {
     param([Parameter(Mandatory = $true)][string]$Path, [switch]$Clobber)
     $exists = & gh release view $Script:MailcorePrebuiltReleaseTag --repo $Script:MailcorePrebuiltRepo --json tagName 2>$null
@@ -61,7 +54,7 @@ if ($PublishDependenciesArchive) {
     Assert-GitHubCli
     $depsPath = "$(Resolve-Path $PublishDependenciesArchive)"
     $depsName = Split-Path $depsPath -Leaf
-    if (Test-ReleaseAsset -AssetName $depsName) {
+    if (Test-MailcoreReleaseAsset -AssetName $depsName) {
         Write-Host "$depsName is already published - nothing to do." -ForegroundColor Green
         return
     }
@@ -87,7 +80,7 @@ Write-Host "  archive       : $ArchiveName" -ForegroundColor Cyan
 Write-Host "  git revision  : $GitRev" -ForegroundColor Cyan
 Write-Host ""
 
-$AlreadyPublished = (-not $SkipUpload) -and (Test-ReleaseAsset -AssetName $ArchiveName)
+$AlreadyPublished = (-not $SkipUpload) -and (Test-MailcoreReleaseAsset -AssetName $ArchiveName)
 if ($AlreadyPublished -and -not $Force) {
     Write-Host "These sources already have a published prebuilt ($ArchiveName) - nothing to do." -ForegroundColor Green
     Write-Host "Pass -Force to rebuild and overwrite it." -ForegroundColor DarkGray

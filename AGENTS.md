@@ -19,8 +19,16 @@ Prebuilt MailCore not found: mailcore2-all-<digest>.zip
 Have you built and uploaded it yet?
 ```
 
-There is no Windows CI. When that error appears, someone has to build and publish from a
-Windows machine — that is what "build and upload the Windows changes" means.
+There is no Windows CI. The `mailcore2 - Windows prebuilt` pull-request check asks the same
+question earlier, on every pull request, and goes red when the answer is no. Either way,
+someone has to build and publish from a Windows machine — that is what "build and upload the
+Windows changes" means.
+
+You can ask the same question yourself, from anywhere, without a Windows machine:
+
+```powershell
+pwsh ./windows/Check-PrebuiltPublished.ps1
+```
 
 ### The whole procedure
 
@@ -75,6 +83,9 @@ Everything is checked by `Setup-Machine.ps1`; this is what it checks for.
   pasted into the shell.
 - *`<name>-git-rev` is X but pins.json says Y* — the build used a dependency checkout at the
   wrong revision. Delete `.build\prebuilt\build-dependencies` and re-run.
+- *The pull-request check is red but the branch head was published* — the base branch moved, so
+  the merge result is different sources. Rebase onto the base branch and publish again. The
+  check says which archive it wanted and which one exists.
 
 ### What not to do
 

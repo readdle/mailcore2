@@ -53,15 +53,32 @@ Two consequences, and they are the whole point:
 - **Nothing to bump, nothing to forget.** A change that does not touch the C/C++ sources — a
   Swift-only fix, a README edit — keeps the same digest and reuses the published archive. No
   pin, no PR, no tag ordering to get right.
-- **A missing prebuilt cannot pass silently.** There is no Windows CI, so the first thing that
-  notices is the spark-core build, and it stops with:
+- **A missing prebuilt cannot pass silently.** The `mailcore2 - Windows prebuilt` pull-request
+  check asks whether an archive exists for the sources being merged, and goes red with:
 
   ```text
-  Prebuilt MailCore not found: mailcore2-all-<digest>.zip
+  There is no Windows prebuilt for these sources: mailcore2-all-<digest>.zip
   Have you built and uploaded it yet?
   ```
 
-### What to do when you see that error ###
+  Should one slip past anyway, the spark-core build stops with the same question.
+
+### The pull-request check ###
+
+`.github/workflows/pull-request-check.yml` runs
+[`windows/Check-PrebuiltPublished.ps1`](windows/Check-PrebuiltPublished.ps1) on every pull
+request. It builds nothing: the digest is a hash of git tree entries, so a Linux runner
+computes it in seconds and then asks the release whether that archive is there. The answer is
+written to the pull request page, not only into the log.
+
+It checks the **merge result**, because that is what lands on the base branch and gets tagged.
+When the base has moved since you published, your branch head has an archive and the merge
+result does not — the check says so and tells you to rebase, rather than leaving you to guess.
+
+A pull request that does not touch the C/C++ sources keeps the same digest and goes green
+without anyone doing anything, which is the point of naming archives after content.
+
+### What to do when it is red ###
 
 Someone with a Windows machine has to build and upload. The whole job is two commands, in a
 checkout of this repository at the revision that needs the archive:
@@ -73,7 +90,8 @@ checkout of this repository at the revision that needs the archive:
 
 That is also all an agent needs to be told — "build and upload the Windows prebuilt for this
 revision". [AGENTS.md](AGENTS.md) carries the procedure, the failure modes and the rules
-(chiefly: publishing commits nothing to this repository).
+(chiefly: publishing commits nothing to this repository). Re-run the check afterwards; nothing
+needs to be pushed for it to turn green.
 
 `Setup-Machine.ps1` reports every prerequisite against `windows/pins.json` and prints the
 install command for whatever is missing; `-Install` runs them for you. `Publish-…` computes the
@@ -95,6 +113,7 @@ sources, so the revision that needs it finds it.
 | `Build-Mailcore2.ps1` | Builds the C/C++ from source. |
 | `Build-SwiftMailcore.ps1` | Builds `src/swift` on top of either of the two. spark-core's entry point. |
 | `Build-Helpers.ps1`, `Common.ps1` | Digest, archive naming, and stand-ins for the internal RD modules. |
+| `Check-PrebuiltPublished.ps1` | Asks whether these sources have a published archive. The pull-request check. |
 | `New-DependenciesArchive.ps1` | Rebuilds the binary build inputs. Has never been needed. |
 | `bin/`, `vs/`, `mailcore2/` | Redistributables and the Visual Studio project files. |
 | `legacy-vs2019/` | The superseded pre-Swift-5.10 scripts. Do not use; they still expect the retired S3 bucket. |

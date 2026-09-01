@@ -60,6 +60,30 @@ jobs:
     - name: Run connected android tests
       run: swift-android build --build-tests
 
+  Windows:
+    name: "mailcore2 - Windows prebuilt"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    # There is no Windows CI: the C/C++ for Windows is built by hand and published as a release
+    # asset named after a digest of the sources. This job does not build anything - it only asks
+    # whether the archive for these sources exists, so that a forgotten upload is caught in the
+    # pull request instead of in the spark-core build days later. The digest is a hash of git
+    # tree entries, identical on every platform, so a Linux runner answers it in seconds.
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 2 # the pull request merge commit and both of its parents
+
+    - name: Check that a prebuilt is published for these sources
+      shell: pwsh
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: ./windows/Check-PrebuiltPublished.ps1
+
   Darwin:
     name: "mailcore2 - ${{ matrix.os }}"
     runs-on: macos-latest
