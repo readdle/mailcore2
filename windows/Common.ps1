@@ -145,10 +145,12 @@ function Get-MailcoreDependenciesRequiredFiles {
         "icu-$($Pins.versions.icu)\usr\lib\x64\icuin$icuMajor.lib",
         "icu-$($Pins.versions.icu)\usr\include\unicode\uversion.h",
         "libxml2-$($Pins.versions.libxml2)\usr\lib\x64\libxml2s.lib",
-        "libxml2-$($Pins.versions.libxml2)\usr\include\libxml\tree.h",
+        # CMakeLists.txt appends /libxml2 to LIBXML_INCLUDE_DIR on Windows, so the headers stay
+        # where libxml2's own install step puts them rather than being relaid.
+        "libxml2-$($Pins.versions.libxml2)\usr\include\libxml2\libxml\tree.h",
         "openssl\lib64\libcrypto.lib",
         "openssl\include\openssl\ssl.h",
-        "sasl\lib64\libsasl.lib",
+        "sasl\lib64\sasl2.lib",
         "sasl\include\sasl\sasl.h",
         "zlib\lib64\zlib.lib",
         "zlib\lib64\zlib.dll",

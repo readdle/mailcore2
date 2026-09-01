@@ -115,12 +115,14 @@ Push-Task -Name "libxml2 $LibXml2Version" -ScriptBlock {
         "-DLIBXML2_WITH_ZLIB=OFF"
     Invoke-CMakeTasks -WorkingDir $source -CMakeArgs ($cmakeArgs -join " ")
 
-    # CMake installs headers under include/libxml2/libxml and the archive under lib/. The build
-    # passes -DLIBXML_INCLUDE_DIR=<usr>\include and -DLIBXML_LIBRARY=<usr>\lib\x64\libxml2s.lib,
-    # so both move up a level.
+    # The install tree is taken as-is: CMakeLists.txt appends /libxml2 to LIBXML_INCLUDE_DIR on
+    # Windows, so headers belong under include/libxml2/libxml exactly where CMake put them. Only
+    # the import library is additionally placed in lib/x64, which is where the build looks
+    # (-DLIBXML_LIBRARY=<usr>\lib\x64\libxml2s.lib).
     $usr = Join-Path $StageRoot $Layout.LibXml2
-    New-Item -ItemType Directory -Path "$usr\include", "$usr\lib\x64" -Force | Out-Null
-    Copy-Item "$prefix\include\libxml2\*" "$usr\include" -Recurse -Force
+    New-Item -ItemType Directory -Path $usr -Force | Out-Null
+    Copy-Item "$prefix\*" $usr -Recurse -Force
+    New-Item -ItemType Directory -Path "$usr\lib\x64" -Force | Out-Null
     Get-ChildItem "$prefix\lib" -Filter *.lib -File | Copy-Item -Destination "$usr\lib\x64" -Force
 }
 
