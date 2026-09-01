@@ -115,6 +115,7 @@ namespace mailcore {
         virtual IMAPSession * session();
         
         virtual void cancelAllOperations();
+        virtual bool interruptCurrentCommand(IMAPOperation * operation);
         virtual unsigned int operationsCount();
         
         virtual void setLastFolder(String * folder);

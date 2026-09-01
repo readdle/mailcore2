@@ -169,6 +169,13 @@ namespace mailcore {
         
         virtual void connect(ErrorCode * pError);
         virtual void disconnect();
+
+        /** Aborts the command currently running on this session by cancelling its stream: the
+         blocked read returns immediately instead of waiting out the socket timeout. Safe to call
+         from another thread while the session's thread is blocked in a command.
+         Teardown only: the cancelled state of a stream is never reset, so the session is unusable
+         afterwards and must be disconnected. A later connect() builds a fresh stream. */
+        virtual void interruptCurrentCommand();
         
         virtual void noop(ErrorCode * pError);
         
