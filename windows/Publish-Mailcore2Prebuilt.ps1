@@ -5,8 +5,6 @@ Param(
     # Local copy of the dependency archive. Downloaded from the release when omitted.
     [string]$PrebuiltDependenciesArchive,
     [string]$WorkPath,
-    # Publish the dependency archive itself (build inputs: ICU, libxml2, openssl, sasl, zlib).
-    [string]$PublishDependenciesArchive,
     # Rebuild and overwrite an archive that is already published. Same digest means the same
     # sources, so this replaces like with like - but it does discard the published bytes.
     [switch]$Force,
@@ -32,40 +30,24 @@ function Assert-GitHubCli {
     }
 }
 
+# Adds one asset to the release. Never creates it: the release and the dependency archive are
+# set up once by hand, and a script that quietly recreated a deleted release would hide the
+# fact that every archive on it had gone with it.
 function Publish-ReleaseAsset {
     param([Parameter(Mandatory = $true)][string]$Path, [switch]$Clobber)
-    $exists = & gh release view $Script:MailcorePrebuiltReleaseTag --repo $Script:MailcorePrebuiltRepo --json tagName 2>$null
-    if ($LASTEXITCODE -ne 0) {
-        Write-TaskLog "Creating release $Script:MailcorePrebuiltReleaseTag"
-        & gh release create $Script:MailcorePrebuiltReleaseTag --repo $Script:MailcorePrebuiltRepo --prerelease `
-            --title "Windows prebuilt binaries" `
-            --notes "Container for the Windows prebuilt archives. Not a code release: mailcore2-all-<digest>.zip is named after the C/C++ sources it was built from, mailcore2-windows-deps-<n>.zip carries the build inputs."
-        if ($LASTEXITCODE -ne 0) { throw "Failed to create release $Script:MailcorePrebuiltReleaseTag" }
-    }
+    Assert-MailcorePrebuiltRelease
     $uploadArgs = @($Script:MailcorePrebuiltReleaseTag, $Path, "--repo", $Script:MailcorePrebuiltRepo)
     if ($Clobber) { $uploadArgs += "--clobber" }
     & gh release upload @uploadArgs
     if ($LASTEXITCODE -ne 0) { throw "Failed to upload $Path" }
 }
 
-# --- Publishing only the dependency archive -------------------------------------------------
-
-if ($PublishDependenciesArchive) {
-    Assert-GitHubCli
-    $depsPath = "$(Resolve-Path $PublishDependenciesArchive)"
-    $depsName = Split-Path $depsPath -Leaf
-    if (Test-MailcoreReleaseAsset -AssetName $depsName) {
-        Write-Host "$depsName is already published - nothing to do." -ForegroundColor Green
-        return
-    }
-    Publish-ReleaseAsset -Path $depsPath
-    Write-Host "Uploaded $depsName" -ForegroundColor Green
-    return
-}
-
 # --- Preflight ------------------------------------------------------------------------------
 
-if (-not $SkipUpload) { Assert-GitHubCli }
+if (-not $SkipUpload) {
+    Assert-GitHubCli
+    Assert-MailcorePrebuiltRelease
+}
 
 $Pins = Get-MailcorePins
 

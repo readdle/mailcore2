@@ -103,7 +103,33 @@ function Get-MailcoreArchiveDigest {
 
 # --- The release ------------------------------------------------------------------------------
 
-# Names of every asset on the prebuilt release, or an empty array when there is no release yet.
+# The release is a container for binaries, not a code release, and it is set up once by hand:
+# nothing in this directory creates it or attaches the dependency archive to it. The scripts
+# only ever add mailcore2-all-<digest>.zip archives to a release that is already there.
+$Script:MailcoreReleaseSetupHelp = @"
+The $Script:MailcorePrebuiltReleaseTag release does not exist, or is not visible to this token.
+
+It is created once, by hand:
+
+  1. https://github.com/$Script:MailcorePrebuiltRepo/releases/new?tag=$Script:MailcorePrebuiltReleaseTag
+     Tag: $Script:MailcorePrebuiltReleaseTag. Tick "Set as a pre-release" - it is a container
+     for binaries, not a code release.
+  2. Attach the dependency archive to it, also once. It carries the binary build inputs
+     (ICU, libxml2, openssl, sasl, zlib) and changes almost never.
+
+From then on the scripts only add archives to it; they never create or delete it.
+"@
+
+function Test-MailcorePrebuiltRelease {
+    & gh release view $Script:MailcorePrebuiltReleaseTag --repo $Script:MailcorePrebuiltRepo --json tagName 2>$null | Out-Null
+    return ($LASTEXITCODE -eq 0)
+}
+
+function Assert-MailcorePrebuiltRelease {
+    if (-not (Test-MailcorePrebuiltRelease)) { throw $Script:MailcoreReleaseSetupHelp }
+}
+
+# Names of every asset on the prebuilt release, or an empty array when there is no release.
 # Needs gh on PATH and authenticated (GH_TOKEN is enough in CI).
 function Get-MailcoreReleaseAssetNames {
     $assets = & gh release view $Script:MailcorePrebuiltReleaseTag --repo $Script:MailcorePrebuiltRepo --json assets --jq ".assets[].name" 2>$null
@@ -192,9 +218,10 @@ function Get-MailcoreDependenciesArchive {
         throw @"
 Could not download the dependency archive $name from $url
 
-It carries the binary build inputs (ICU, libxml2, openssl, sasl, zlib) and is published once,
-by hand. Build it with .\windows\New-DependenciesArchive.ps1, or pass a local copy with
--PrebuiltDependenciesArchive <path>.
+It carries the binary build inputs (ICU, libxml2, openssl, sasl, zlib) and is attached to the
+$Script:MailcorePrebuiltReleaseTag release once, by hand - no script uploads it. Attach it, or
+pass a local copy with -PrebuiltDependenciesArchive <path>. To rebuild it from scratch, see
+.\windows\New-DependenciesArchive.ps1.
 
 Download error: $($_.Exception.Message)
 "@

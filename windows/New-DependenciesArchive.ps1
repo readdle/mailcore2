@@ -9,12 +9,10 @@
 #
 #     .\windows\New-DependenciesArchive.ps1 -BaseArchive .\mailcore2-windows-deps-1.zip
 #
-# Publishing it is a separate, deliberate step:
-#
-#     .\windows\Publish-Mailcore2Prebuilt.ps1 -PublishDependenciesArchive <path>
-#
-# Bumping the archive means editing dependenciesArchive in pins.json, which changes the digest
-# and asks every consumer for a new mailcore2-all archive. That is the intended behaviour.
+# Nothing here publishes it. Attaching it to the release is a manual, deliberate step, the same
+# way the release itself is created by hand - and bumping it means editing dependenciesArchive
+# in pins.json, which changes the digest and asks every consumer for a new mailcore2-all
+# archive. That is the intended behaviour, but it should never be a side effect of a script.
 
 Param(
     # An existing dependency archive to carry openssl, sasl and zlib over from.
@@ -167,6 +165,8 @@ Write-Host ""
 Write-Host "Built $OutputPath" -ForegroundColor Green
 Write-Host "  sha256: $((Get-FileHash $OutputPath -Algorithm SHA256).Hash)" -ForegroundColor Green
 Write-Host ""
-Write-Host "Publish it with:" -ForegroundColor Green
-Write-Host "    .\windows\Publish-Mailcore2Prebuilt.ps1 -PublishDependenciesArchive $OutputPath"
+Write-Host "To put it into service, by hand:" -ForegroundColor Green
+Write-Host "  1. Attach it to the $Script:MailcorePrebuiltReleaseTag release."
+Write-Host "  2. If the name changed, set dependenciesArchive in windows\pins.json to match."
+Write-Host "     That changes the digest, so every consumer will ask for a new archive."
 Write-Host ""

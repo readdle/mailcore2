@@ -40,6 +40,25 @@ if (-not $CompareRef) {
 }
 
 $target = Get-DigestInfo -AtRef $Ref
+
+# "No release" and "release without this archive" need different answers: the first is a
+# one-time setup step nobody has done, the second is a build nobody has published.
+if (-not (Test-MailcorePrebuiltRelease)) {
+    Write-Host ""
+    Write-Host $Script:MailcoreReleaseSetupHelp -ForegroundColor Red
+    Write-Host ""
+    if ($env:GITHUB_STEP_SUMMARY) {
+        Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value @"
+### Windows prebuilt: no release
+
+``$($Script:MailcorePrebuiltReleaseTag)`` does not exist yet. It is created once, by hand, and the
+dependency archive is attached to it once. Until then no prebuilt can be published at all.
+"@
+    }
+    Write-Host "::error title=Windows prebuilt release missing::The $Script:MailcorePrebuiltReleaseTag release does not exist. It is created once, by hand."
+    exit 1
+}
+
 $published = Get-MailcoreReleaseAssetNames
 
 Write-Host ""

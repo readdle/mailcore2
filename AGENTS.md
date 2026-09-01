@@ -54,6 +54,16 @@ a release asset.
 the revision that needs it will find it. Committing, opening the PR and tagging are the
 developer's job, not the agent's.
 
+### The release
+
+The `windows-prebuilt` release is a container for binaries, not a code release. It is created
+once, by hand, and the dependency archive is attached to it once. **No script creates it, and
+no script attaches that archive** — `Publish-Mailcore2Prebuilt.ps1` only ever adds
+`mailcore2-all-<digest>.zip` to a release that is already there, and stops with instructions if
+it is not.
+
+Do not work around a missing release by creating one. Say that it is missing.
+
 ### Requirements
 
 Everything is checked by `Setup-Machine.ps1`; this is what it checks for.
@@ -74,11 +84,13 @@ Everything is checked by `Setup-Machine.ps1`; this is what it checks for.
 - *MSVC toolset / Windows SDK / Swift … not found* — the machine does not match the pins. Run
   `.\windows\Setup-Machine.ps1` and follow it. Editing `windows\pins.json` to match the machine
   instead is a deliberate act: it changes the digest, so every consumer will need a new archive.
+- *The windows-prebuilt release does not exist* — it is created by hand, once, and is not
+  something to script around. Ask the developer; see "The release" below.
 - *Could not download the dependency archive* — the build inputs (ICU, libxml2, openssl, sasl,
-  zlib) are published once as `mailcore2-windows-deps-<n>.zip`. Rebuild it with
-  `.\windows\New-DependenciesArchive.ps1`, publish it with
-  `Publish-Mailcore2Prebuilt.ps1 -PublishDependenciesArchive <path>`, or point at a local copy
-  with `-PrebuiltDependenciesArchive <path>`.
+  zlib) live on the release as `mailcore2-windows-deps-<n>.zip`, attached by hand once. If it
+  is not there, ask the developer to attach it, or point at a local copy with
+  `-PrebuiltDependenciesArchive <path>`. `.\windows\New-DependenciesArchive.ps1` rebuilds the
+  archive itself, but publishing it is never an agent's call.
 - *GitHub CLI is not authenticated* — `gh auth login`. Do not work around this with a token
   pasted into the shell.
 - *`<name>-git-rev` is X but pins.json says Y* — the build used a dependency checkout at the
@@ -94,6 +106,7 @@ Everything is checked by `Setup-Machine.ps1`; this is what it checks for.
   keep downloading it by name. Re-uploading the *same* digest after a rebuild is the only
   legitimate replacement, and `-Force` exists for exactly that.
 - Do not add a version number anywhere. The digest replaced it; there is nothing to bump.
+- Do not create the release or attach the dependency archive. Both are one-time manual acts.
 
 ### The one thing the digest does not cover
 

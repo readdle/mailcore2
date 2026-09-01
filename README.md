@@ -83,6 +83,21 @@ protection rules for `spark2`. Worth waiting until the first archive has been pu
 before that there is no release at all, so every pull request touching the C/C++ goes red,
 correctly but uselessly.
 
+### The release, set up once ###
+
+`windows-prebuilt` is a container for binaries, not a code release. It is created by hand, one
+time, and the dependency archive is attached to it by hand, one time:
+
+1. [Create the release](https://github.com/readdle/mailcore2/releases/new?tag=windows-prebuilt)
+   with tag `windows-prebuilt`, marked as a pre-release.
+2. Attach `mailcore2-windows-deps-1.zip` to it.
+
+From then on `Publish-Mailcore2Prebuilt.ps1` only adds `mailcore2-all-<digest>.zip` archives to
+it. Nothing in `windows/` creates the release, attaches the dependency archive, or deletes
+anything — a script that quietly recreated a deleted release would hide the fact that every
+archive on it had gone too. When the release is missing, the publish script and the
+pull-request check both stop and say so.
+
 ### What to do when it is red ###
 
 Someone with a Windows machine has to build and upload. The whole job is two commands, in a
@@ -113,7 +128,7 @@ sources, so the revision that needs it finds it.
 |---|---|
 | `pins.json` | Everything besides the C/C++ sources that determines the binaries. Part of the digest. |
 | `Setup-Machine.ps1` | Checks this machine against the pins; `-Install` installs what is missing. |
-| `Publish-Mailcore2Prebuilt.ps1` | Build + verify + upload. The one command that matters. |
+| `Publish-Mailcore2Prebuilt.ps1` | Build + verify + add to the release. The one command that matters. |
 | `Get-Mailcore2.ps1` | Downloads the archive for the current sources. Called by the Swift build. |
 | `Build-Mailcore2.ps1` | Builds the C/C++ from source. |
 | `Build-SwiftMailcore.ps1` | Builds `src/swift` on top of either of the two. spark-core's entry point. |
@@ -158,15 +173,17 @@ mailcore2-windows-deps/
   zlib/{include,lib64}
 ```
 
-It is downloaded automatically and has never changed. `New-DependenciesArchive.ps1` regenerates
-it: ICU from the official `icu4c-69_1-Win64-MSVC2019.zip`, libxml2 built from source (static,
-all optional backends off), and openssl/sasl/zlib carried over from an existing archive, since
-those are Readdle-built binaries with no public source. The layout above is asserted in one
-place — `Assert-MailcoreDependenciesLayout` in `Common.ps1` — and both the generator and the
-build check against it.
+It is attached to the release by hand once and downloaded automatically from then on; it has
+never changed. `New-DependenciesArchive.ps1` regenerates it — ICU from the official
+`icu4c-69_1-Win64-MSVC2019.zip`, libxml2 built from source (static, all optional backends off),
+and openssl/sasl/zlib carried over from an existing archive, since those are Readdle-built
+binaries with no public source — but it does not publish it. The layout above is asserted in
+one place, `Assert-MailcoreDependenciesLayout` in `Common.ps1`, checked against the archive
+that is actually published, and both the generator and the build validate against it.
 
-Bumping it means editing `dependenciesArchive` in `pins.json`, which changes the digest and
-asks every consumer for a new `mailcore2-all` archive. That is intended.
+Replacing it means attaching the new one by hand and editing `dependenciesArchive` in
+`pins.json`, which changes the digest and asks every consumer for a new `mailcore2-all`
+archive. That is intended.
 
 ### What the archive must contain ###
 
