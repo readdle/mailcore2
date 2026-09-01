@@ -114,8 +114,13 @@ if (-not $PrebuiltDependenciesArchive) {
 # Only the install tree and the staging copy: what gets packaged, not how it compiles. Without
 # this a second publish from a different revision on the same machine ships the first one's
 # leftovers.
-Push-Task -Name "Clean previous install tree" -ScriptBlock {
-    foreach ($stale in $InstallPath, $StagePath) {
+# src/CMakeLists.txt stages the public headers into the CMake binary directory with file(COPY)
+# and installs that whole directory. file(COPY) adds but never prunes, so a header staged there
+# by an earlier build on this machine - a different branch, an older revision - survives and is
+# packaged even though this revision does not declare it public. Deleting the build directory is
+# the only thing that stops it; it costs a full rebuild, which a publish does anyway.
+Push-Task -Name "Clean previous build output" -ScriptBlock {
+    foreach ($stale in $InstallPath, $StagePath, "$ProjectRoot\.build\mailcore2") {
         if (Test-Path -LiteralPath $stale) {
             Write-TaskLog "Removing $stale"
             Remove-Item -LiteralPath $stale -Recurse -Force
@@ -198,7 +203,11 @@ Push-Task -Name "Verify $ArchiveName" -ScriptBlock {
     $missing = $required | Where-Object { -not (Test-Path -LiteralPath "$checkDir\mailcore2-all\bin\$_") }
     if ($missing) { throw "The archive is missing: $($missing -join ', ')" }
 
-    $requiredHeaders = @("include\MailCore\MCIMAPAsyncConnection.h")
+    # A header that public-headers.cmake has always declared. Naming one that a particular
+    # feature adds makes the check fail on revisions that predate it - and worse, pass on a
+    # stale copy left in the build directory, which is how a header from another branch was
+    # once packaged.
+    $requiredHeaders = @("include\MailCore\MailCore.h")
     $missingHeaders = $requiredHeaders | Where-Object { -not (Test-Path -LiteralPath "$checkDir\mailcore2-all\$_") }
     if ($missingHeaders) { throw "The archive is missing headers: $($missingHeaders -join ', ')" }
 
