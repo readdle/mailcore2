@@ -1,12 +1,22 @@
 Param(
     [string]$DependenciesPath,
     [string]$InstallPath,
+    [string]$PrebuiltDependenciesArchive,
     [switch]$Install = $false
 )
 
-Import-Module RDBuildCMake
-Import-Module RDBuildMSVC
-Import-Module RDDependency
+# The RD modules are internal. Without them the build falls back to the helper next to this
+# script, so a plain clone of the public repository is enough to build.
+$RequiredRDModules = "RDBuildCMake", "RDBuildMSVC", "RDDependency"
+$MissingRDModules = $RequiredRDModules | Where-Object { -not (Get-Module -ListAvailable $_) }
+if ($MissingRDModules) {
+    . "$PSScriptRoot\Build-Helpers.ps1"
+}
+else {
+    Import-Module RDBuildCMake
+    Import-Module RDBuildMSVC
+    Import-Module RDDependency
+}
 
 $ProjectRoot = "$(Resolve-Path ""$PSScriptRoot\..\"")"
 if (-Not $DependenciesPath) {
@@ -42,15 +52,27 @@ $OpenSslDependencySourceUrl = "https://spark-prebuilt-binaries.s3.amazonaws.com/
 $OpenSslDependencyDir = "OpenSSL"
 $OpenSslDependencyPath = "$DependenciesPath\$OpenSslDependencyDir\openssl-win32"
 
+# One archive carries every binary build input (ICU, libxml2, openssl, sasl, zlib), so a bare
+# machine needs neither the S3 key nor a manual C:\Library layout.
+if ($PrebuiltDependenciesArchive) {
+    $PrebuiltDependenciesArchive = "$(Resolve-Path $PrebuiltDependenciesArchive)"
+    $LocalPrebuiltRoot = "$DependenciesPath\mailcore2-windows-deps"
+    $ZlibDependencyPath = "$LocalPrebuiltRoot\zlib"
+    $SaslDependencyPath = "$LocalPrebuiltRoot\sasl"
+    $OpenSslDependencyPath = "$LocalPrebuiltRoot\openssl"
+    $IcuPath = "$LocalPrebuiltRoot\icu-$IcuVersion\usr"
+    $LibXml2Path = "$LocalPrebuiltRoot\libxml2-$LibXml2Version\usr"
+}
+
 $S3Key = $env:SPARK_PREBUILT_KEY
-if (!$S3Key) {
+if (!$PrebuiltDependenciesArchive -and !$S3Key) {
     throw "Spark prebuilt storage key(SPARK_PREBUILT_KEY) is required"
 }
 
 $Dependencies = @(
-    @{ Name = "CTemplate"; GitUrl = "git@github.com:readdle/ctemplate.git"; GitBranch = "master"; Directory = $CTemplateDependencyDir; }
-    @{ Name = "LibEtPan"; GitUrl = "git@github.com:readdle/libetpan.git"; GitRevision = "master"; Directory = $LibEtPanDependencyDir; }
-    @{ Name = "Tidy HTML5"; GitUrl = "git@github.com:readdle/tidy-html5.git"; GitBranch = "spark2"; Directory = $TidyDependencyDir; }
+    @{ Name = "CTemplate"; GitUrl = "https://github.com/readdle/ctemplate.git"; GitBranch = "master"; Directory = $CTemplateDependencyDir; }
+    @{ Name = "LibEtPan"; GitUrl = "https://github.com/readdle/libetpan.git"; GitRevision = "master"; Directory = $LibEtPanDependencyDir; }
+    @{ Name = "Tidy HTML5"; GitUrl = "https://github.com/readdle/tidy-html5.git"; GitBranch = "spark2"; Directory = $TidyDependencyDir; }
 )
 
 Push-Task -Name "mailcore2" -ScriptBlock {
@@ -67,12 +89,18 @@ Push-Task -Name "mailcore2" -ScriptBlock {
         Write-TaskLog "Found Swift SDK: $SwiftSDKPath"
 
         Initialize-Dependencies -Path $Script:DependenciesPath -Dependencies $Script:Dependencies
-        Invoke-RestMethod -Uri $OpenSslDependencySourceUrl -OutFile "$DependenciesPath\OpenSsl.zip" -UserAgent $S3Key
-        Invoke-RestMethod -Uri $SaslDependencySourceUrl -OutFile "$DependenciesPath\SASL.zip" -UserAgent $S3Key
-        Invoke-RestMethod -Uri $ZlibDependencySourceUrl -OutFile "$DependenciesPath\zlib.zip" -UserAgent $S3Key
-        Expand-Archive -Path "$DependenciesPath\OpenSsl.zip" -DestinationPath $OpenSslDependencyPath -Force
-        Expand-Archive -Path "$DependenciesPath\SASL.zip" -DestinationPath $SaslDependencyPath -Force
-        Expand-Archive -Path "$DependenciesPath\zlib.zip" -DestinationPath $ZlibDependencyPath -Force
+        if ($PrebuiltDependenciesArchive) {
+            Write-TaskLog "Extracting local prebuilt dependencies from $PrebuiltDependenciesArchive"
+            Expand-Archive -Path $PrebuiltDependenciesArchive -DestinationPath $DependenciesPath -Force
+        }
+        else {
+            Invoke-RestMethod -Uri $OpenSslDependencySourceUrl -OutFile "$DependenciesPath\OpenSsl.zip" -UserAgent $S3Key
+            Invoke-RestMethod -Uri $SaslDependencySourceUrl -OutFile "$DependenciesPath\SASL.zip" -UserAgent $S3Key
+            Invoke-RestMethod -Uri $ZlibDependencySourceUrl -OutFile "$DependenciesPath\zlib.zip" -UserAgent $S3Key
+            Expand-Archive -Path "$DependenciesPath\OpenSsl.zip" -DestinationPath $OpenSslDependencyPath -Force
+            Expand-Archive -Path "$DependenciesPath\SASL.zip" -DestinationPath $SaslDependencyPath -Force
+            Expand-Archive -Path "$DependenciesPath\zlib.zip" -DestinationPath $ZlibDependencyPath -Force
+        }
         
         Push-Task -Name "Prepare Build Environment" -ScriptBlock {
             Test-Directory $IcuPath -SuccessMessage "Found ICU at $IcuPath" -FailMessage "ICU not found at $IcuPath"
@@ -144,8 +172,8 @@ Push-Task -Name "mailcore2" -ScriptBlock {
             Copy-Item -Path "$CTemplateDependencyPath\x64\Release\*" -Destination "$ExternalsPath\lib64" -Exclude "*.dll" -Recurse -Force -ErrorAction Stop -PassThru | Write-Host
             Copy-Item -Path "$LibEtPanDependencyPath\build-windows\include" -Destination $ExternalsPath -Recurse -Force -ErrorAction Stop -PassThru | Write-Host
             Copy-Item -Path "$LibEtPanDependencyPath\build-windows\x64\Release\*" -Destination "$ExternalsPath\lib64" -Exclude "*.dll" -Recurse -Force -ErrorAction Stop -PassThru | Write-Host
-            Copy-Item -Path "$TidyDependencyPath\include" -Destination "$ExternalsPath\include\tidy" -Recurse -Force -ErrorAction Stop -PassThru | Write-Host
-            Copy-Item -Path "$TidyDependencyPath\rdtidy.lib" -Destination "$ExternalsPath\lib64" -Force -ErrorAction Stop -PassThru | Write-Host
+            Copy-Item -Path "$TidyDependencyPath\include\*" -Destination "$ExternalsPath\include\tidy" -Recurse -Force -ErrorAction Stop -PassThru | Write-Host
+            Copy-Item -Path "$TidyDependencyPath\lib\rdtidy.lib" -Destination "$ExternalsPath\lib64" -Force -ErrorAction Stop -PassThru | Write-Host
 
             Copy-Item -Path "$ProjectRoot\build-windows-5.10\vs\ctemplate\include\template_cache.h" -Destination "$ExternalsPath\include\ctemplate" -Force -ErrorAction Stop | Write-Host
             Copy-Item -Path "$ProjectRoot\build-windows-5.10\vs\ctemplate\include\template_string.h" -Destination "$ExternalsPath\include\ctemplate" -Force -ErrorAction Stop | Write-Host
@@ -167,6 +195,14 @@ Push-Task -Name "mailcore2" -ScriptBlock {
                 Install-File "$PSScriptRoot\bin\msvcp120.dll" -Destination $BinDir
                 Install-File "$PSScriptRoot\bin\msvcr120.dll" -Destination $BinDir
 
+                Install-File "$IcuPath\bin\icuuc$IcuVersionMajor.dll" -Destination $BinDir
+                Install-File "$IcuPath\bin\icuin$IcuVersionMajor.dll" -Destination $BinDir
+                Install-File "$IcuPath\bin\icudt$IcuVersionMajor.dll" -Destination $BinDir
+
+                $SwiftRuntimeBin = Split-Path (Get-Command dispatch.dll -ErrorAction Stop).Source
+                Install-File "$SwiftRuntimeBin\dispatch.dll" -Destination $BinDir
+                Install-File "$SwiftRuntimeBin\BlocksRuntime.dll" -Destination $BinDir
+
                 Install-File "$ZlibDependencyPath\lib64\zlib.dll" -Destination $BinDir
                 Install-File "$ZlibDependencyPath\lib64\zlib.pdb" -Destination $BinDir
                 Install-File "$ZlibDependencyPath\include\zlib.h" -Destination $IncludeDir
@@ -175,8 +211,6 @@ Push-Task -Name "mailcore2" -ScriptBlock {
 
                 Install-File "$TidyDependencyPath\bin\rdtidy.dll" -Destination $BinDir
                 Install-File "$TidyDependencyPath\bin\rdtidy.pdb" -Destination $BinDir
-                Install-File "$TidyDependencyPath\include\buffio.h" -Destination "$IncludeDir\tidy"
-                Install-File "$TidyDependencyPath\include\platform.h" -Destination "$IncludeDir\tidy"
                 Install-File "$TidyDependencyPath\include\tidy.h" -Destination "$IncludeDir\tidy"
                 Install-File "$TidyDependencyPath\include\tidybuffio.h" -Destination "$IncludeDir\tidy"
                 Install-File "$TidyDependencyPath\include\tidyenum.h" -Destination "$IncludeDir\tidy"
