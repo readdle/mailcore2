@@ -1,12 +1,9 @@
-# Builds the Windows prebuilt for the sources in this checkout and uploads it as a release
-# asset. See AGENTS.md for the procedure and README.md for how the whole thing works.
-
 Param(
     # Local copy of the dependency archive. Downloaded from the release when omitted.
     [string]$PrebuiltDependenciesArchive,
     [string]$WorkPath,
     # Rebuild and overwrite an archive that is already published. Same digest means the same
-    # sources, so this replaces like with like - but it does discard the published bytes.
+    # sources, so this replaces like with like.
     [switch]$Force,
     [switch]$SkipUpload
 )
@@ -66,9 +63,6 @@ if ($AlreadyPublished -and -not $Force) {
     Write-Host "Pass -Force to rebuild and overwrite it." -ForegroundColor DarkGray
     return
 }
-if ($AlreadyPublished) {
-    Write-Host "$ArchiveName is already published; -Force given, it will be rebuilt and overwritten." -ForegroundColor Yellow
-}
 
 Push-Task -Name "Verify toolchain against windows\pins.json" -ScriptBlock {
     $toolsetRoot = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\$($Pins.toolchain.msvcToolset)"
@@ -79,7 +73,14 @@ Push-Task -Name "Verify toolchain against windows\pins.json" -ScriptBlock {
     if (-not (Test-Path -LiteralPath $sdkRoot)) {
         throw "Windows SDK $($Pins.toolchain.windowsSdk) not found at $sdkRoot. Install it, or update windows\pins.json."
     }
-    Initialize-MailcoreSdkRoot
+    $swiftPlatform = Join-Path $env:LOCALAPPDATA "Programs\Swift\Platforms\$($Pins.toolchain.swift)"
+    if (-not (Test-Path -LiteralPath $swiftPlatform)) {
+        throw "Swift $($Pins.toolchain.swift) not found at $swiftPlatform. Install it, or update windows\pins.json."
+    }
+    if (-not $env:SDKROOT) {
+        $env:SDKROOT = Join-Path $swiftPlatform "Windows.platform\Developer\SDKs\Windows.sdk"
+        Write-TaskLog "SDKROOT was unset, using $env:SDKROOT"
+    }
     Write-TaskLog "Toolchain matches the pins"
 }
 
@@ -93,16 +94,28 @@ $ArchivePath = "$WorkPath\$ArchiveName"
 New-Item -ItemType Directory -Path $WorkPath -Force | Out-Null
 
 if (-not $PrebuiltDependenciesArchive) {
-    $PrebuiltDependenciesArchive = Get-MailcoreDependenciesArchive -WorkPath $WorkPath -Pins $Pins
+    $depsName = $Pins.dependenciesArchive
+    $PrebuiltDependenciesArchive = "$WorkPath\$depsName"
+    if (-not (Test-Path -LiteralPath $PrebuiltDependenciesArchive)) {
+        $depsUrl = Get-MailcorePrebuiltUrl -ArchiveName $depsName
+        Push-Task -Name "Download $depsName" -ScriptBlock {
+            try {
+                Invoke-RestMethod -Uri $depsUrl -OutFile $PrebuiltDependenciesArchive
+            }
+            catch {
+                throw "Could not download the dependency archive $depsName from $depsUrl. Publish it once with -PublishDependenciesArchive <path>, or pass -PrebuiltDependenciesArchive <path> to use a local copy.`n$($_.Exception.Message)"
+            }
+        }
+    }
 }
 
 # --- Build ------------------------------------------------------------------------------------
 
-# A published archive must contain only what this build produced. The install tree and the
-# CMake output are reused across runs otherwise, so a second publish from a different revision
-# on the same machine would ship leftovers from the first.
-Push-Task -Name "Clean previous build output" -ScriptBlock {
-    foreach ($stale in $InstallPath, $StagePath, "$ProjectRoot\.build\mailcore2", "$ProjectRoot\Externals") {
+# Only the install tree and the staging copy: what gets packaged, not how it compiles. Without
+# this a second publish from a different revision on the same machine ships the first one's
+# leftovers.
+Push-Task -Name "Clean previous install tree" -ScriptBlock {
+    foreach ($stale in $InstallPath, $StagePath) {
         if (Test-Path -LiteralPath $stale) {
             Write-TaskLog "Removing $stale"
             Remove-Item -LiteralPath $stale -Recurse -Force
@@ -116,14 +129,15 @@ Push-Task -Name "Build mailcore2" -ScriptBlock {
         -InstallPath $InstallPath `
         -PrebuiltDependenciesArchive $PrebuiltDependenciesArchive `
         -Install
+    if ($LASTEXITCODE -ne 0) { throw "Build-Mailcore2.ps1 failed" }
 }
 
 Push-Task -Name "Stamp source digest" -ScriptBlock {
     New-Item -ItemType Directory -Path "$InstallPath\etc" -Force | Out-Null
     [IO.File]::WriteAllText("$InstallPath\etc\mailcore2-source-digest", "$Digest`n", (New-Object Text.UTF8Encoding $false))
 
-    # The digest covers the pinned revisions, so the archive must really have been built from
-    # them. Initialize-Dependencies re-points an existing checkout, and this is the proof.
+    # The digest covers the pinned revisions, so the archive must have been built from them.
+    # Initialize-Dependencies never updates an existing checkout, so a stale one is caught here.
     $expected = [ordered]@{
         "mailcore2-git-rev"  = $GitRev
         "ctemplate-git-rev"  = $Pins.dependencies.CTemplate.revision
@@ -135,18 +149,14 @@ Push-Task -Name "Stamp source digest" -ScriptBlock {
         if (-not (Test-Path -LiteralPath $stampPath)) { throw "The install tree has no $($entry.Key)" }
         $actual = (Get-Content -LiteralPath $stampPath -Raw).Trim()
         if ($actual -ne $entry.Value) {
-            throw "$($entry.Key) is $actual but pins.json and the checkout say $($entry.Value)"
+            throw "$($entry.Key) is $actual but pins.json and the checkout say $($entry.Value). Delete $DependenciesPath and re-run."
         }
     }
-    Write-TaskLog "Install tree matches the checkout and the pins"
 }
 
 Push-Task -Name "Package $ArchiveName" -ScriptBlock {
     # The artifact must run without a separately installed VC redistributable.
     $vcRedistRoot = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\BuildTools\VC\Redist\MSVC"
-    if (-not (Test-Path -LiteralPath $vcRedistRoot)) {
-        throw "No VC redistributable under $vcRedistRoot. Install the C++ workload of VS 2022 Build Tools."
-    }
     $vcCrt = Get-ChildItem $vcRedistRoot -Filter msvcp140.dll -File -Recurse |
         Where-Object FullName -Match '\\x64\\Microsoft\.VC143\.CRT\\' |
         Sort-Object FullName -Descending |
@@ -181,17 +191,14 @@ Push-Task -Name "Verify $ArchiveName" -ScriptBlock {
         "mailcore2.dll", "CMailCore.dll",
         "libetpan.dll", "libctemplate.dll", "rdtidy.dll",
         "libcrypto-1_1-x64.dll", "libssl-1_1-x64.dll", "zlib.dll", "sasl2.dll",
+        "icuuc69.dll", "icuin69.dll", "icudt69.dll",
         "dispatch.dll", "BlocksRuntime.dll",
-        "msvcp140.dll", "vcruntime140.dll",
-        # Still linked by the prebuilt ctemplate and libetpan.
-        "msvcp120.dll", "msvcr120.dll"
+        "msvcp140.dll", "vcruntime140.dll"
     )
-    $icuMajor = $Pins.versions.icu.Split(".")[0]
-    $required += @("icuuc$icuMajor.dll", "icuin$icuMajor.dll", "icudt$icuMajor.dll")
     $missing = $required | Where-Object { -not (Test-Path -LiteralPath "$checkDir\mailcore2-all\bin\$_") }
     if ($missing) { throw "The archive is missing: $($missing -join ', ')" }
 
-    $requiredHeaders = @("include\MailCore\MailCore.h", "include\CMailCore\CMailCore.h")
+    $requiredHeaders = @("include\CMailCore\CIMAPAsyncConnection.h", "include\MailCore\MCIMAPAsyncConnection.h")
     $missingHeaders = $requiredHeaders | Where-Object { -not (Test-Path -LiteralPath "$checkDir\mailcore2-all\$_") }
     if ($missingHeaders) { throw "The archive is missing headers: $($missingHeaders -join ', ')" }
 

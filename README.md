@@ -44,8 +44,8 @@ mailcore2-all-<digest>.zip
 ```
 
 The digest is a hash of git's tree entries for everything that determines the binaries — `src`
-without `src/swift`, `CMakeLists.txt`, and `windows/pins.json` (the pinned dependency revisions,
-ICU/libxml2 versions and toolchain). It is computed the same way on every platform:
+without `src/swift`, `CMakeLists.txt`, and `windows/pins.json` (the pinned dependency revisions
+and toolchain). It is computed the same way on every platform:
 `core.autocrlf` cannot change it, because git already stores a hash per blob.
 
 Two consequences, and they are the whole point:
@@ -92,11 +92,10 @@ tag `windows-prebuilt`, marked as a pre-release, with `mailcore2-windows-deps-1.
 
 ### What to do when it is red ###
 
-Someone with a Windows machine has to build and upload. The whole job is two commands, in a
+Someone with a Windows machine has to build and upload. The whole job is one command, in a
 checkout of this repository at the revision that needs the archive:
 
 ```powershell
-.\windows\Setup-Machine.ps1
 .\windows\Publish-Mailcore2Prebuilt.ps1
 ```
 
@@ -105,11 +104,10 @@ revision". [AGENTS.md](AGENTS.md) carries the procedure, the failure modes and t
 (chiefly: publishing commits nothing to this repository). Re-run the check afterwards; nothing
 needs to be pushed for it to turn green.
 
-`Setup-Machine.ps1` reports every prerequisite against `windows/pins.json` and prints the
-install command for whatever is missing; `-Install` runs them for you. `Publish-…` computes the
-digest, exits early if that archive is already published, verifies the toolchain, fetches the
-dependency archive, cleans previous output, builds, checks the install tree really came from
-the pinned revisions, stamps `etc/mailcore2-source-digest`, packages, verifies, and uploads.
+It computes the digest, exits early if that archive is already published, verifies the
+toolchain against `windows/pins.json`, fetches the dependency archive, clears the previous
+install tree, builds, checks the install tree really came from the pinned revisions, stamps
+`etc/mailcore2-source-digest`, packages, verifies, and adds it to the release.
 
 Commit, PR and tag as usual — in any order, at any time. The archive is named after the
 sources, so the revision that needs it finds it.
@@ -119,22 +117,20 @@ sources, so the revision that needs it finds it.
 | | |
 |---|---|
 | `pins.json` | Everything besides the C/C++ sources that determines the binaries. Part of the digest. |
-| `Setup-Machine.ps1` | Checks this machine against the pins; `-Install` installs what is missing. |
 | `Publish-Mailcore2Prebuilt.ps1` | Build + verify + add to the release. The one command that matters. |
 | `Get-Mailcore2.ps1` | Downloads the archive for the current sources. Called by the Swift build. |
 | `Build-Mailcore2.ps1` | Builds the C/C++ from source. |
 | `Build-SwiftMailcore.ps1` | Builds `src/swift` on top of either of the two. spark-core's entry point. |
 | `Build-Helpers.ps1`, `Common.ps1` | Digest, archive naming, and stand-ins for the internal RD modules. |
 | `Check-PrebuiltPublished.ps1` | Asks whether these sources have a published archive. The pull-request check. |
-| `New-DependenciesArchive.ps1` | Rebuilds the binary build inputs. Has never been needed. |
 | `bin/`, `vs/`, `mailcore2/` | Redistributables and the Visual Studio project files. |
 | `legacy-vs2019/` | The superseded pre-Swift-5.10 scripts. Do not use; they still expect the retired S3 bucket. |
 
 ### Requirements ###
 
-All of it is checked by `Setup-Machine.ps1`, which changes nothing unless given `-Install`. No
-AWS key, no `C:\Library` layout and no SSH access are required — the repository and every
-dependency are public.
+No AWS key, no `C:\Library` layout and no SSH access are required — the repository and every
+dependency are public. Nothing here installs a toolchain for you; a machine that does not match
+the pins says which version it is missing and stops.
 
 - Windows 10 or 11 x64, PowerShell 7, Git.
 - Visual Studio 2022 Build Tools with the C++ workload, CMake and Ninja.
@@ -166,12 +162,15 @@ mailcore2-windows-deps/
 ```
 
 It is attached to the release by hand once and downloaded automatically from then on; it has
-never changed. `New-DependenciesArchive.ps1` regenerates it — ICU from the official
-`icu4c-69_1-Win64-MSVC2019.zip`, libxml2 built from source (static, all optional backends off),
-and openssl/sasl/zlib carried over from an existing archive, since those are Readdle-built
-binaries with no public source — but it does not publish it. The layout above is asserted in
-one place, `Assert-MailcoreDependenciesLayout` in `Common.ps1`, checked against the archive
-that is actually published, and both the generator and the build validate against it.
+never changed.
+
+How the current one was assembled, in case it ever needs regenerating: ICU 69.1 is the official
+`icu4c-69_1-Win64-MSVC2019.zip` distribution, relaid under `icu-69.1/usr` (`bin64` to `usr/bin`,
+`lib64` to `usr/lib/x64`); libxml2 2.11.5 is built from source with CMake/Ninja and MSVC
+14.39.33519 (`CMAKE_BUILD_TYPE=Release`, `BUILD_SHARED_LIBS=OFF`, and
+`LIBXML2_WITH_ICONV/ICU/LZMA/MODULES/PROGRAMS/PYTHON/TESTS/ZLIB` all `OFF`), installed straight
+into `libxml2-2.11.5/usr` with the import library also copied to `usr/lib/x64`; openssl, sasl
+and zlib are the previously S3-hosted binary zips, unchanged.
 
 Replacing it means attaching the new one by hand and editing `dependenciesArchive` in
 `pins.json`, which changes the digest and asks every consumer for a new `mailcore2-all`

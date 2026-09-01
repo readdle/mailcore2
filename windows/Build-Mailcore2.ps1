@@ -19,10 +19,11 @@ $BinDir = "$InstallPath\bin"
 $IncludeDir = "$InstallPath\include"
 $LibDir = "$InstallPath\lib"
 
-$Pins = Get-MailcorePins
-$IcuVersion = $Pins.versions.icu
-$IcuVersionMajor = $IcuVersion.Split(".")[0]
-$LibXml2Version = $Pins.versions.libxml2
+$IcuVersionMajor = "69"
+$IcuVersion = "$IcuVersionMajor.1"
+$LibXml2Version = "2.11.5"
+$IcuPath = "C:\Library\icu-$IcuVersion\usr"
+$LibXml2Path = "C:\Library\libxml2-$LibXml2Version\usr"
 
 $CTemplateDependencyDir = "CTemplate"
 $CTemplateDependencyPath = "$DependenciesPath\$CTemplateDependencyDir"
@@ -30,24 +31,36 @@ $LibEtPanDependencyDir = "LibEtPan"
 $LibEtPanDependencyPath = "$DependenciesPath\$LibEtPanDependencyDir"
 $TidyDependencyDir = "TidyHTML5"
 $TidyDependencyPath = "$DependenciesPath\$TidyDependencyDir"
+$ZlibDependencySourceUrl = "https://spark-prebuilt-binaries.s3.amazonaws.com/zlib.zip"
+$ZlibDependencyDir = "zlib"
+$ZlibDependencyPath = "$DependenciesPath\$ZlibDependencyDir\zlib-win32-1"
+$SaslDependencySourceUrl = "https://spark-prebuilt-binaries.s3.amazonaws.com/sasl.zip"
+$SaslDependencyDir = "SASL"
+$SaslDependencyPath = "$DependenciesPath\$SaslDependencyDir\cyrus-sasl-win32"
+$OpenSslDependencySourceUrl = "https://spark-prebuilt-binaries.s3.amazonaws.com/openssl.zip"
+$OpenSslDependencyDir = "OpenSSL"
+$OpenSslDependencyPath = "$DependenciesPath\$OpenSslDependencyDir\openssl-win32"
 
-# One public archive carries every binary build input (ICU, libxml2, openssl, sasl, zlib), so a
-# bare machine needs no credentials and no manual C:\Library layout. Downloaded on demand when
-# a local copy was not supplied.
+# One archive carries every binary build input (ICU, libxml2, openssl, sasl, zlib), so a bare
+# machine needs neither the S3 key nor a manual C:\Library layout.
 if ($PrebuiltDependenciesArchive) {
-    # Resolved before anything changes the working directory.
     $PrebuiltDependenciesArchive = "$(Resolve-Path $PrebuiltDependenciesArchive)"
+    $LocalPrebuiltRoot = "$DependenciesPath\mailcore2-windows-deps"
+    $ZlibDependencyPath = "$LocalPrebuiltRoot\zlib"
+    $SaslDependencyPath = "$LocalPrebuiltRoot\sasl"
+    $OpenSslDependencyPath = "$LocalPrebuiltRoot\openssl"
+    $IcuPath = "$LocalPrebuiltRoot\icu-$IcuVersion\usr"
+    $LibXml2Path = "$LocalPrebuiltRoot\libxml2-$LibXml2Version\usr"
 }
-$PrebuiltRoot = "$DependenciesPath\mailcore2-windows-deps"
-$Layout = Get-MailcoreDependenciesLayout -Pins $Pins
-$IcuPath = "$PrebuiltRoot\$($Layout.Icu)"
-$LibXml2Path = "$PrebuiltRoot\$($Layout.LibXml2)"
-$OpenSslDependencyPath = "$PrebuiltRoot\$($Layout.OpenSsl)"
-$SaslDependencyPath = "$PrebuiltRoot\$($Layout.Sasl)"
-$ZlibDependencyPath = "$PrebuiltRoot\$($Layout.Zlib)"
 
-# Pinned to exact commits in pins.json: their build outputs ship inside the archive, so a
-# moving branch would silently change what the published binaries contain.
+$S3Key = $env:SPARK_PREBUILT_KEY
+if (!$PrebuiltDependenciesArchive -and !$S3Key) {
+    throw "Spark prebuilt storage key(SPARK_PREBUILT_KEY) is required"
+}
+
+# Pinned to exact commits in pins.json: their build outputs ship inside the
+# archive, so a moving branch would silently change what the published binaries contain.
+$Pins = Get-MailcorePins
 $Dependencies = @(
     @{ Name = "CTemplate"; GitUrl = $Pins.dependencies.CTemplate.url; GitRevision = $Pins.dependencies.CTemplate.revision; Directory = $CTemplateDependencyDir; }
     @{ Name = "LibEtPan"; GitUrl = $Pins.dependencies.LibEtPan.url; GitRevision = $Pins.dependencies.LibEtPan.revision; Directory = $LibEtPanDependencyDir; }
@@ -61,7 +74,6 @@ Push-Task -Name "mailcore2" -ScriptBlock {
     }
 
     try {
-        Initialize-MailcoreSdkRoot
         $SwiftSDKPath = $Env:SDKROOT
         if (-not (Test-Path $SwiftSDKPath)) {
             throw "SDK path is not set or invalid. Make sure you have SDKROOT environment variable specified correctly."
@@ -69,19 +81,23 @@ Push-Task -Name "mailcore2" -ScriptBlock {
         Write-TaskLog "Found Swift SDK: $SwiftSDKPath"
 
         Initialize-Dependencies -Path $Script:DependenciesPath -Dependencies $Script:Dependencies
-        Push-Task -Name "Unpack binary dependencies" -ScriptBlock {
-            if (-not $PrebuiltDependenciesArchive) {
-                $Script:PrebuiltDependenciesArchive = Get-MailcoreDependenciesArchive -WorkPath $DependenciesPath -Pins $Pins
-            }
-            # A stale tree from an older archive must not survive: files it no longer contains
-            # would otherwise still be linked in.
-            if (Test-Path -LiteralPath $PrebuiltRoot) { Remove-Item -LiteralPath $PrebuiltRoot -Recurse -Force }
-            Write-TaskLog "Extracting $PrebuiltDependenciesArchive"
+        if ($PrebuiltDependenciesArchive) {
+            Write-TaskLog "Extracting local prebuilt dependencies from $PrebuiltDependenciesArchive"
             Expand-Archive -Path $PrebuiltDependenciesArchive -DestinationPath $DependenciesPath -Force
-            Assert-MailcoreDependenciesLayout -Root $PrebuiltRoot -Pins $Pins
+        }
+        else {
+            Invoke-RestMethod -Uri $OpenSslDependencySourceUrl -OutFile "$DependenciesPath\OpenSsl.zip" -UserAgent $S3Key
+            Invoke-RestMethod -Uri $SaslDependencySourceUrl -OutFile "$DependenciesPath\SASL.zip" -UserAgent $S3Key
+            Invoke-RestMethod -Uri $ZlibDependencySourceUrl -OutFile "$DependenciesPath\zlib.zip" -UserAgent $S3Key
+            Expand-Archive -Path "$DependenciesPath\OpenSsl.zip" -DestinationPath $OpenSslDependencyPath -Force
+            Expand-Archive -Path "$DependenciesPath\SASL.zip" -DestinationPath $SaslDependencyPath -Force
+            Expand-Archive -Path "$DependenciesPath\zlib.zip" -DestinationPath $ZlibDependencyPath -Force
         }
         
         Push-Task -Name "Prepare Build Environment" -ScriptBlock {
+            Test-Directory $IcuPath -SuccessMessage "Found ICU at $IcuPath" -FailMessage "ICU not found at $IcuPath"
+            Test-Directory $LibXml2Path -SuccessMessage "Found LibXml2 at $LibXml2Path" -FailMessage "ICU not found at $LibXml2Path"
+
             Write-TaskLog "Configuring VS environment"
             Invoke-VsDevCmd -Version "2022"
             Initialize-Toolchain
@@ -223,17 +239,11 @@ Push-Task -Name "mailcore2" -ScriptBlock {
 
         if ($Install) {
             Push-Task -Name "Collect Git Revision Data" -ScriptBlock {
-                New-Item -Path "$InstallPath\etc" -ItemType Directory -Force -ErrorAction Ignore | Out-Null
-                # Written explicitly rather than with `>`: PowerShell 5.1 redirects as UTF-16
-                # and 7 as UTF-8, and these files are read back by the publish step.
-                @{
-                    "ctemplate-git-rev"  = (& git -C "$CTemplateDependencyPath" rev-parse HEAD)
-                    "libetpan-git-rev"   = (& git -C "$LibEtPanDependencyPath" rev-parse HEAD)
-                    "tidy-html5-git-rev" = (& git -C "$TidyDependencyPath" rev-parse HEAD)
-                    "mailcore2-git-rev"  = (& git -C "$ProjectRoot" rev-parse HEAD)
-                }.GetEnumerator() | ForEach-Object {
-                    [IO.File]::WriteAllText("$InstallPath\etc\$($_.Key)", "$($_.Value)`n", (New-Object Text.UTF8Encoding $false))
-                }
+                New-Item -Path "$InstallPath\etc" -ItemType Directory -ErrorAction Ignore
+                git -C "$CTemplateDependencyPath" rev-parse HEAD > "$InstallPath\etc\ctemplate-git-rev"
+                git -C "$LibEtPanDependencyPath" rev-parse HEAD > "$InstallPath\etc\libetpan-git-rev"
+                git -C "$TidyDependencyPath" rev-parse HEAD > "$InstallPath\etc\tidy-html5-git-rev"
+                git rev-parse HEAD > "$InstallPath\etc\mailcore2-git-rev"
             }
         }
     }

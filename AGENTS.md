@@ -36,19 +36,14 @@ On a Windows machine, in a checkout of this repository **at the revision that ne
 prebuilt** (a branch head, a tag, anything committed):
 
 ```powershell
-.\windows\Setup-Machine.ps1
 .\windows\Publish-Mailcore2Prebuilt.ps1
 ```
 
-`Setup-Machine.ps1` reports every prerequisite and prints the install command for whatever is
-missing; it changes nothing unless given `-Install`. Run it first on an unfamiliar machine,
-skip it once it has come back green.
-
-`Publish-Mailcore2Prebuilt.ps1` is the entire job. It computes the digest, exits early if that
+That is the entire job. It computes the digest, exits early if that
 archive already exists, verifies the toolchain against `windows\pins.json`, fetches the
-dependency archive, cleans previous build output, builds, checks the install tree really came
-from the pinned revisions, stamps the digest, packages, verifies the package, and uploads it as
-a release asset.
+dependency archive, clears the previous install tree, builds, checks the install tree really
+came from the pinned revisions, stamps the digest, packages, verifies the package, and adds it
+to the release.
 
 **Do not commit anything to mailcore2 afterwards.** The archive is named after the sources, so
 the revision that needs it will find it. Committing, opening the PR and tagging are the
@@ -61,8 +56,6 @@ Archives live on the permanent `windows-prebuilt` release, set up by hand once.
 missing, say so rather than creating one.
 
 ### Requirements
-
-Everything is checked by `Setup-Machine.ps1`; this is what it checks for.
 
 - Windows machine with the toolchain pinned in `windows\pins.json` (Swift, MSVC toolset,
   Windows SDK). Those versions are not advisory — the build puts exactly them on PATH and
@@ -77,17 +70,20 @@ Everything is checked by `Setup-Machine.ps1`; this is what it checks for.
 
 - *Uncommitted changes under …* — commit them first, or test locally by passing
   `-BuildMailcore2` to `Build-SwiftMailcore.ps1` instead of publishing.
-- *MSVC toolset / Windows SDK / Swift … not found* — the machine does not match the pins. Run
-  `.\windows\Setup-Machine.ps1` and follow it. Editing `windows\pins.json` to match the machine
-  instead is a deliberate act: it changes the digest, so every consumer will need a new archive.
+- *MSVC toolset / Windows SDK / Swift … not found* — the machine does not match the pins.
+  Install the pinned version; toolsets live side by side. Editing `windows\pins.json` to match
+  the machine instead is a deliberate act: it changes the digest, so every consumer will need a
+  new archive.
 - *The windows-prebuilt release does not exist* — ask the developer; see "The release" below.
 - *Could not download the dependency archive* — the build inputs (ICU, libxml2, openssl, sasl,
   zlib) live on the release as `mailcore2-windows-deps-<n>.zip`. If it is not there, ask the
   developer to attach it, or point at a local copy with `-PrebuiltDependenciesArchive <path>`.
+  How the current one was assembled is in the README, should it ever need regenerating.
 - *GitHub CLI is not authenticated* — `gh auth login`. Do not work around this with a token
   pasted into the shell.
-- *`<name>-git-rev` is X but pins.json says Y* — the build used a dependency checkout at the
-  wrong revision. Delete `.build\prebuilt\build-dependencies` and re-run.
+- *`<name>-git-rev` is X but pins.json says Y* — a dependency checkout left over from an older
+  pin. `Initialize-Dependencies` never updates an existing clone, so delete
+  `.build\prebuilt\build-dependencies` and re-run.
 - *The pull-request check is red but the branch head was published* — the base branch moved, so
   the merge result is different sources. Rebase onto the base branch and publish again. The
   check says which archive it wanted and which one exists.

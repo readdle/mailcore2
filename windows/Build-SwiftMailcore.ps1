@@ -1,22 +1,11 @@
-# Compiles the Swift bindings (src/swift) on top of the mailcore2 C/C++ libraries. By default
-# those come from the published prebuilt archive; -BuildMailcore2 compiles them from source
-# instead. This is the entry point spark-core calls.
-
 Param(
     [string]$DependenciesPath,
     [string]$InstallPath,
-    # Local copy of the dependency archive, forwarded to Build-Mailcore2.ps1.
-    [string]$PrebuiltDependenciesArchive,
     [switch]$Install = $false,
     [switch]$BuildMailcore2 = $false
 )
 
-. "$PSScriptRoot\Common.ps1"
-
 $ProjectRoot = "$(Resolve-Path ""$PSScriptRoot\..\"")"
-if (-Not $DependenciesPath) {
-    $DependenciesPath = "$ProjectRoot\.build\Dependencies"
-}
 
 $SourceFiles = Get-ChildItem -Path "$ProjectRoot\src\swift\*.swift" -Recurse -File 
 $ResourcesPath = "$ProjectRoot\resources"
@@ -33,16 +22,11 @@ $IncludeDir = "$InstallPath\include"
 $LibDir = "$InstallPath\lib"
 $BundleResourcesDir = "$BinDir\$ModuleName.resources"
 
-$Pins = Get-MailcorePins
-$Layout = Get-MailcoreDependenciesLayout -Pins $Pins
-$PrebuiltRoot = "$DependenciesPath\mailcore2-windows-deps"
-
-# Prefer the unpacked dependency archive when it is there (any machine that has run
-# Build-Mailcore2.ps1), and fall back to the hand-made C:\Library layout of the CI image.
-$IcuPath = "$PrebuiltRoot\$($Layout.Icu)"
-if (-not (Test-Path -LiteralPath $IcuPath)) {
-    $IcuPath = "C:\Library\icu-$($Pins.versions.icu)\usr"
-}
+$IcuVersionMajor = "69"
+$IcuVersion = "$IcuVersionMajor.1"
+$LibXml2Version = "2.11.5"
+$IcuPath = "C:\Library\icu-$IcuVersion\usr"
+$LibXml2Path = "C:\Library\libxml2-$LibXml2Version\usr"
 
 $SwiftIncludePaths = 
     "$InstallPath\include"
@@ -85,8 +69,7 @@ Push-Task -Name $ModuleName -ScriptBlock {
     }
 
     if ($BuildMailcore2) {
-        & $PSScriptRoot\Build-Mailcore2.ps1 -InstallPath $InstallPath -DependenciesPath $DependenciesPath `
-            -PrebuiltDependenciesArchive $PrebuiltDependenciesArchive -Install
+        & $PSScriptRoot\Build-Mailcore2.ps1 -InstallPath $InstallPath -DependenciesPath $DependenciesPath -Install
     }
     else {
         & $PSScriptRoot\Get-Mailcore2.ps1 -InstallPath $InstallPath
