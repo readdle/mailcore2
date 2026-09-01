@@ -1,12 +1,16 @@
 Param(
     [string]$DependenciesPath,
     [string]$InstallPath,
+    # Local copy of the dependency archive. Downloaded from the release when omitted.
+    [string]$PrebuiltDependenciesArchive,
     [switch]$Install = $false
 )
 
 Import-Module RDBuildCMake
 Import-Module RDBuildMSVC
 Import-Module RDDependency
+
+. "$PSScriptRoot\Prebuilt-Common.ps1"
 
 $ProjectRoot = "$(Resolve-Path ""$PSScriptRoot\..\"")"
 if (-Not $DependenciesPath) {
@@ -32,19 +36,18 @@ $LibEtPanDependencyDir = "LibEtPan"
 $LibEtPanDependencyPath = "$DependenciesPath\$LibEtPanDependencyDir"
 $TidyDependencyDir = "TidyHTML5"
 $TidyDependencyPath = "$DependenciesPath\$TidyDependencyDir"
-$ZlibDependencySourceUrl = "https://spark-prebuilt-binaries.s3.amazonaws.com/zlib.zip"
-$ZlibDependencyDir = "zlib"
-$ZlibDependencyPath = "$DependenciesPath\$ZlibDependencyDir\zlib-win32-1"
-$SaslDependencySourceUrl = "https://spark-prebuilt-binaries.s3.amazonaws.com/sasl.zip"
-$SaslDependencyDir = "SASL"
-$SaslDependencyPath = "$DependenciesPath\$SaslDependencyDir\cyrus-sasl-win32"
-$OpenSslDependencySourceUrl = "https://spark-prebuilt-binaries.s3.amazonaws.com/openssl.zip"
-$OpenSslDependencyDir = "OpenSSL"
-$OpenSslDependencyPath = "$DependenciesPath\$OpenSslDependencyDir\openssl-win32"
+# openssl, sasl and zlib used to come from the spark-prebuilt-binaries S3 bucket, one zip each,
+# behind SPARK_PREBUILT_KEY. They are the same binaries, now carried by a single public asset on
+# the prebuilt release, so no credential is involved. ICU and libxml2 never came from S3 and are
+# unchanged: they arrive with the toolchain, under C:\Library.
+$PrebuiltDependenciesRoot = "$DependenciesPath\mailcore2-windows-deps"
+$ZlibDependencyPath = "$PrebuiltDependenciesRoot\zlib"
+$SaslDependencyPath = "$PrebuiltDependenciesRoot\sasl"
+$OpenSslDependencyPath = "$PrebuiltDependenciesRoot\openssl"
 
-$S3Key = $env:SPARK_PREBUILT_KEY
-if (!$S3Key) {
-    throw "Spark prebuilt storage key(SPARK_PREBUILT_KEY) is required"
+if ($PrebuiltDependenciesArchive) {
+    # Resolved before anything changes the working directory.
+    $PrebuiltDependenciesArchive = "$(Resolve-Path $PrebuiltDependenciesArchive)"
 }
 
 $Dependencies = @(
@@ -67,12 +70,19 @@ Push-Task -Name "mailcore2" -ScriptBlock {
         Write-TaskLog "Found Swift SDK: $SwiftSDKPath"
 
         Initialize-Dependencies -Path $Script:DependenciesPath -Dependencies $Script:Dependencies
-        Invoke-RestMethod -Uri $OpenSslDependencySourceUrl -OutFile "$DependenciesPath\OpenSsl.zip" -UserAgent $S3Key
-        Invoke-RestMethod -Uri $SaslDependencySourceUrl -OutFile "$DependenciesPath\SASL.zip" -UserAgent $S3Key
-        Invoke-RestMethod -Uri $ZlibDependencySourceUrl -OutFile "$DependenciesPath\zlib.zip" -UserAgent $S3Key
-        Expand-Archive -Path "$DependenciesPath\OpenSsl.zip" -DestinationPath $OpenSslDependencyPath -Force
-        Expand-Archive -Path "$DependenciesPath\SASL.zip" -DestinationPath $SaslDependencyPath -Force
-        Expand-Archive -Path "$DependenciesPath\zlib.zip" -DestinationPath $ZlibDependencyPath -Force
+        Push-Task -Name "Fetch binary dependencies" -ScriptBlock {
+            $archive = $PrebuiltDependenciesArchive
+            if (-not $archive) {
+                $archive = Get-MailcoreDependenciesArchive -WorkPath $DependenciesPath
+            }
+            # A tree left by an older archive must not survive: files it no longer contains
+            # would otherwise still be picked up.
+            if (Test-Path -LiteralPath $PrebuiltDependenciesRoot) {
+                Remove-Item -LiteralPath $PrebuiltDependenciesRoot -Recurse -Force
+            }
+            Write-TaskLog "Extracting $archive"
+            Expand-Archive -Path $archive -DestinationPath $DependenciesPath -Force
+        }
         
         Push-Task -Name "Prepare Build Environment" -ScriptBlock {
             Test-Directory $IcuPath -SuccessMessage "Found ICU at $IcuPath" -FailMessage "ICU not found at $IcuPath"
