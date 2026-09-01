@@ -109,7 +109,6 @@ if ($baseMoved) {
 else {
     Write-Host "If not: on a Windows machine, in a checkout of this branch," -ForegroundColor Yellow
     Write-Host ""
-    Write-Host "    .\windows\Setup-Machine.ps1"
     Write-Host "    .\windows\Publish-Mailcore2Prebuilt.ps1"
     Write-Host ""
     Write-Host "and re-run this check. Publishing commits nothing - the archive is named after" -ForegroundColor Yellow
@@ -148,7 +147,6 @@ There is no ``$($target.Archive)`` on the [``$Script:MailcorePrebuiltReleaseTag`
 If not, on a Windows machine in a checkout of this branch:
 
 ``````powershell
-.\windows\Setup-Machine.ps1
 .\windows\Publish-Mailcore2Prebuilt.ps1
 ``````
 

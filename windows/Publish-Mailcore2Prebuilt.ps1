@@ -103,7 +103,7 @@ if (-not $PrebuiltDependenciesArchive) {
                 Invoke-RestMethod -Uri $depsUrl -OutFile $PrebuiltDependenciesArchive
             }
             catch {
-                throw "Could not download the dependency archive $depsName from $depsUrl. Publish it once with -PublishDependenciesArchive <path>, or pass -PrebuiltDependenciesArchive <path> to use a local copy.`n$($_.Exception.Message)"
+                throw "Could not download the dependency archive $depsName from $depsUrl. It is attached to the $Script:MailcorePrebuiltReleaseTag release by hand, once; attach it, or pass -PrebuiltDependenciesArchive <path> to use a local copy.`n$($_.Exception.Message)"
             }
         }
     }
