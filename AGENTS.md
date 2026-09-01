@@ -108,11 +108,11 @@ logging, error messages, refactoring — need nothing.
 
 ## Building without the internal RD modules
 
-`build-windows-5.10\Build-Helpers.ps1` provides the subset of the internal `RDBuildCMake` / `RDBuildMSVC`
-/ `RDDependency` modules that the C/C++ build uses, and `Prebuilt-Common.ps1` dot-sources it after
-importing those modules so it wins even where they are installed — the pinned toolchain has to
-be the one that actually runs. A plain clone plus the pinned toolchain is enough to build and
-publish the prebuilt.
+`build-windows-5.10\Build-Helpers.ps1` provides the subset of the internal `RDBuildCMake` /
+`RDBuildMSVC` / `RDDependency` modules that the C/C++ build uses. `Prebuilt-Common.ps1` loads one
+or the other, not both: the real modules when they are installed, these stand-ins when they are
+not. So a plain clone plus the pinned toolchain is enough to build and publish the prebuilt,
+while the CI image keeps using the real modules.
 
 The Swift build (`Build-SwiftMailcore.ps1`) is the exception: `Initialize-SDK` and
 `Invoke-BuildModuleTarget` are not reimplemented, so that script still needs the real RD
