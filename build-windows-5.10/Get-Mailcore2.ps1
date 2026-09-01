@@ -35,6 +35,12 @@ Push-Task -Name "mailcore2" -ScriptBlock {
             Invoke-RestMethod -Uri $PrebuiltMailcoreUrl -OutFile $TempFile
         }
         catch {
+            # Only a 404 means "nobody published this yet". Anything else - a proxy, a dropped
+            # connection, a 5xx - must not be reported as a missing archive.
+            $Status = Get-MailcoreHttpStatus -ErrorRecord $_
+            if ($Status -ne 404) {
+                throw "Could not download $PrebuiltMailcoreUrl$(if ($Status) { " (HTTP $Status)" }). $($_.Exception.Message)"
+            }
             throw @"
 Prebuilt MailCore not found: $PrebuiltMailcoreArchive
 Have you built and uploaded it yet?
@@ -47,8 +53,6 @@ On a Windows build machine, in a checkout at this exact revision, run:
 Nothing needs to be committed afterwards - the archive is named after the sources, so this
 revision will find it. To build the C++ from source instead, pass -BuildMailcore2 to
 Build-SwiftMailcore.ps1.
-
-Download error: $($_.Exception.Message)
 "@
         }
         Remove-Item $TempDir -Force -Recurse -ErrorAction Ignore

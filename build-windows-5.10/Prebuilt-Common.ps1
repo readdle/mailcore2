@@ -76,6 +76,17 @@ function Get-MailcorePrebuiltArchiveName {
     return "mailcore2-windows-$($Digest.Substring(0, 12)).zip"
 }
 
+# The HTTP status behind a failed Invoke-RestMethod / Invoke-WebRequest, or $null when the
+# request never got a response at all - DNS, proxy, a dropped connection. Windows PowerShell
+# raises WebException and PowerShell 7 raises HttpResponseException; both expose .Response with
+# a .StatusCode, so this works on either.
+function Get-MailcoreHttpStatus {
+    param([Parameter(Mandatory = $true)]$ErrorRecord)
+    $response = $ErrorRecord.Exception.Response
+    if (-not $response) { return $null }
+    try { return [int]$response.StatusCode } catch { return $null }
+}
+
 function Get-MailcorePrebuiltUrl {
     param([Parameter(Mandatory = $true)][string]$ArchiveName)
     return "$Script:MailcorePrebuiltUrlBase/$ArchiveName"
@@ -147,13 +158,15 @@ function Get-MailcoreDependenciesArchive {
     }
     catch {
         Remove-Item -LiteralPath $path -Force -ErrorAction Ignore
+        $status = Get-MailcoreHttpStatus -ErrorRecord $_
+        if ($status -ne 404) {
+            throw "Could not download the dependency archive $name from $url$(if ($status) { " (HTTP $status)" }). $($_.Exception.Message)"
+        }
         throw @"
-Could not download the dependency archive $name from $url
+The dependency archive $name is not on the $Script:MailcorePrebuiltReleaseTag release.
 
-It carries openssl, sasl and zlib, and is attached to the $Script:MailcorePrebuiltReleaseTag
-release by hand, once. Attach it, or drop a copy at $path and it will be used as is.
-
-Download error: $($_.Exception.Message)
+It carries openssl, sasl and zlib, and is attached by hand, once. Attach it, or drop a copy at
+$path and it will be used as is.
 "@
     }
     return $path
