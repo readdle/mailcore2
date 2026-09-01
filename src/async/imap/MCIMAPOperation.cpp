@@ -176,6 +176,26 @@ void IMAPOperation::beforeMain()
 {
 }
 
+bool IMAPOperation::interruptCurrentCommand()
+{
+    if (mSession == NULL) {
+        return false;
+    }
+
+    return mSession->interruptCurrentCommand(this);
+}
+
+void IMAPOperation::interrupt()
+{
+    // Called by the connection's queue while this operation is the one running, so the stream below
+    // is the one its command is blocked on.
+    if (mSession == NULL) {
+        return;
+    }
+
+    mSession->session()->interruptCurrentCommand();
+}
+
 void IMAPOperation::afterMain()
 {
     if (mSession->session()->isAutomaticConfigurationDone()) {

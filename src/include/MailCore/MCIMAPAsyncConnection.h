@@ -93,6 +93,10 @@ namespace mailcore {
         
         virtual IMAPOperation * disconnectOperation();
 
+        // How long an idle connection stays open once its queue drains.
+        virtual void setAutomaticDisconnectDelay(time_t delay);
+        virtual time_t automaticDisconnectDelay();
+
     private:
         IMAPSession * mSession;
         OperationQueue * mQueue;
@@ -107,6 +111,8 @@ namespace mailcore {
         bool mAutomaticConfigurationEnabled;
         bool mQueueRunning;
         bool mScheduledAutomaticDisconnect;
+        bool mReserved;
+        time_t mAutomaticDisconnectDelay;
         
         virtual void tryAutomaticDisconnectAfterDelay(void * context);
 
@@ -115,7 +121,13 @@ namespace mailcore {
         virtual IMAPSession * session();
         
         virtual void cancelAllOperations();
+        virtual bool interruptCurrentCommand(IMAPOperation * operation);
         virtual unsigned int operationsCount();
+
+        // A reserved connection belongs to one lease holder: the session selection skips it,
+        // so only operations explicitly pointed at it (IMAPOperation::setSession) run there.
+        virtual void setReserved(bool reserved);
+        virtual bool isReserved();
         
         virtual void setLastFolder(String * folder);
         virtual String * lastFolder();

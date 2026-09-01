@@ -21,6 +21,7 @@ set(CMAILCORE_BASETYPES_HEADERS
 
 set(CMAILCORE_IMAP_HEADERS
 	c/imap/CIMAPAppendMessageOperation.h
+	c/imap/CIMAPAsyncConnection.h
 	c/imap/CIMAPAsyncSession.h
 	c/imap/CIMAPBaseOperation.h
 	c/imap/CIMAPCapabilityOperation.h
