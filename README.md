@@ -40,7 +40,7 @@ The archive is **named after the content of the sources it was built from**, not
 version number:
 
 ```text
-mailcore2-all-<digest>.zip
+mailcore2-windows-<digest>.zip
 ```
 
 The digest is a hash of git's tree entries for everything that determines the binaries — `src`
@@ -57,7 +57,7 @@ Two consequences, and they are the whole point:
   check asks whether an archive exists for the sources being merged, and goes red with:
 
   ```text
-  There is no Windows prebuilt for these sources: mailcore2-all-<digest>.zip
+  There is no Windows prebuilt for these sources: mailcore2-windows-<digest>.zip
   Have you built and uploaded it yet?
   ```
 
@@ -88,7 +88,7 @@ correctly but uselessly.
 The archives live on a permanent [`windows-prebuilt`](https://github.com/readdle/mailcore2/releases/tag/windows-prebuilt)
 release — a container for binaries, not a code release. Created by hand, one time:
 tag `windows-prebuilt`, marked as a pre-release, with `mailcore2-windows-deps-1.zip` attached.
-`Publish-Mailcore2Prebuilt.ps1` then only adds `mailcore2-all-<digest>.zip` archives to it.
+`Publish-Mailcore2Prebuilt.ps1` then only adds `mailcore2-windows-<digest>.zip` archives to it.
 
 ### What to do when it is red ###
 
@@ -173,7 +173,7 @@ into `libxml2-2.11.5/usr` with the import library also copied to `usr/lib/x64`; 
 and zlib are the previously S3-hosted binary zips, unchanged.
 
 Replacing it means attaching the new one by hand and editing `dependenciesArchive` in
-`pins.json`, which changes the digest and asks every consumer for a new `mailcore2-all`
+`pins.json`, which changes the digest and asks every consumer for a new `mailcore2-windows`
 archive. That is intended.
 
 ### What the archive must contain ###
@@ -210,7 +210,7 @@ after the build, and previous build output is deleted before a publish.
 
 ### Retention ###
 
-Never delete a published `mailcore2-all-<digest>.zip` — revisions built against it keep
+Never delete a published `mailcore2-windows-<digest>.zip` — revisions built against it keep
 downloading it by name. Re-uploading the same digest after a rebuild is the only legitimate
 replacement (`-Force`), and it is safe by construction: same digest means same sources.
 

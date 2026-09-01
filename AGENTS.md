@@ -15,7 +15,7 @@ whose name is derived from the content of the C/C++ sources, so **sources that w
 simply have no archive** and the Spark build says so:
 
 ```
-Prebuilt MailCore not found: mailcore2-all-<digest>.zip
+Prebuilt MailCore not found: mailcore2-windows-<digest>.zip
 Have you built and uploaded it yet?
 ```
 
@@ -52,7 +52,7 @@ developer's job, not the agent's.
 ### The release
 
 Archives live on the permanent `windows-prebuilt` release, set up by hand once.
-`Publish-Mailcore2Prebuilt.ps1` only adds `mailcore2-all-<digest>.zip` to it. If it is somehow
+`Publish-Mailcore2Prebuilt.ps1` only adds `mailcore2-windows-<digest>.zip` to it. If it is somehow
 missing, say so rather than creating one.
 
 ### Requirements
@@ -91,7 +91,7 @@ missing, say so rather than creating one.
 ### What not to do
 
 - Do not edit the archive by hand or upload one built from an uncommitted tree.
-- Do not delete a published `mailcore2-all-<digest>.zip`: revisions that were built against it
+- Do not delete a published `mailcore2-windows-<digest>.zip`: revisions that were built against it
   keep downloading it by name. Re-uploading the *same* digest after a rebuild is the only
   legitimate replacement, and `-Force` exists for exactly that.
 - Do not add a version number anywhere. The digest replaced it; there is nothing to bump.

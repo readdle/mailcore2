@@ -82,7 +82,7 @@ function Get-MailcoreSourceDigest {
 
 function Get-MailcorePrebuiltArchiveName {
     param([Parameter(Mandatory = $true)][string]$Digest)
-    return "mailcore2-all-$($Digest.Substring(0, 12)).zip"
+    return "mailcore2-windows-$($Digest.Substring(0, 12)).zip"
 }
 
 function Get-MailcorePrebuiltUrl {
