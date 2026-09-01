@@ -34,10 +34,11 @@ Read [instructions for Linux](https://github.com/MailCore/mailcore2/blob/master/
 Windows builds of spark-core do **not** compile mailcore2 C++ from source.
 `Build-SparkCore.ps1` clones this repo at a pinned tag and runs
 `build-windows-5.10\Build-SwiftMailcore.ps1`, which compiles only the Swift
-bindings (`src/swift`) and downloads the prebuilt C++ libraries from S3
-(`Get-Mailcore2.ps1`, `mailcore2-all-<N>.zip`). **Any C++ change reaches
-Windows only through a new prebuilt archive** — merging a PR or moving a tag
-is not enough.
+bindings (`src/swift`) and downloads the prebuilt C/C++ libraries
+(`Get-Mailcore2.ps1`, `mailcore2-all-<N>.zip`). The prebuilt archives are
+stored as **GitHub Release assets of this repository** (Releases page of
+`readdle/mailcore2`). **Any C++ change reaches Windows only through a new
+prebuilt archive** — merging a PR or moving a tag is not enough.
 
 ### Prerequisites ###
 
@@ -98,27 +99,32 @@ the top-level layout.
 
 ### Upload ###
 
-The bucket is `spark-prebuilt-binaries` in **eu-central-1**.
-`SPARK_PREBUILT_KEY` is a download-only token — uploads need real AWS
-credentials:
+The archives live as release assets of this repository. Attach the new zip to
+the release that holds the prebuilt binaries (create it from the shipped tag
+with `gh release create` on first use):
 
 ```bash
-aws s3 cp mailcore2-all-<N+1>.zip s3://spark-prebuilt-binaries/mailcore2-all-<N+1>.zip --region eu-central-1
+gh release upload <release-tag> mailcore2-all-<N+1>.zip --repo readdle/mailcore2
 ```
 
-Verify the build can fetch it the same way the script does:
+Verify the asset is in place and downloadable:
 
-```powershell
-Invoke-RestMethod -Method Head -Uri "https://spark-prebuilt-binaries.s3.amazonaws.com/mailcore2-all-<N+1>.zip" -UserAgent $env:SPARK_PREBUILT_KEY
+```bash
+gh release view <release-tag> --repo readdle/mailcore2
+gh release download <release-tag> --pattern "mailcore2-all-<N+1>.zip" --repo readdle/mailcore2 --output /tmp/check.zip
 ```
 
-Never overwrite an existing `mailcore2-all-<N>.zip` — older tags keep
-downloading it by name.
+The repository is private, so a plain browser URL needs authentication — the
+build downloads the asset with the token configured for it (see
+`Get-Mailcore2.ps1`). Never delete or overwrite an existing
+`mailcore2-all-<N>.zip` asset — older tags keep downloading it by name.
 
 ### Switch builds to the new prebuilt ###
 
 1. In this repo: bump `$PrebuiltMailcoreVersion` in
-   `build-windows-5.10/Get-Mailcore2.ps1`, PR into `spark2`.
+   `build-windows-5.10/Get-Mailcore2.ps1` (and make sure its download URL
+   points at the release asset the archive was uploaded to), PR into
+   `spark2`.
 2. Tag the merge with the next `2.1.x` tag. The bump **must be inside the
    tag** — spark-core runs `Get-Mailcore2.ps1` from its mailcore checkout at
    that tag, so a tag without the bump silently downloads the previous
