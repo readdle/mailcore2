@@ -22,18 +22,33 @@ function Test-Directory {
     Write-Host $SuccessMessage
 }
 
-# Shallow-clones each dependency once. A directory that already has .git is taken as ready: the
-# remote and HEAD are not re-checked and an existing checkout is never updated - delete it to
-# force a refetch.
+# Fetches each dependency once, shallow. A directory that already has .git is taken as ready:
+# the remote and HEAD are not re-checked and an existing checkout is never updated - delete it
+# to force a refetch.
+#
+# GitRevision may be an exact commit, which `git clone --branch` cannot take, so a pinned
+# revision is fetched into an empty repository instead. GitBranch keeps the plain clone path.
 function Initialize-Dependencies {
     param([string]$Path, [array]$Dependencies)
     New-Item -ItemType Directory -Path $Path -Force | Out-Null
     foreach ($dependency in $Dependencies) {
         $destination = Join-Path $Path $dependency.Directory
-        if (-not (Test-Path -LiteralPath (Join-Path $destination ".git"))) {
-            $ref = if ($dependency.GitBranch) { $dependency.GitBranch } else { $dependency.GitRevision }
-            git clone --branch $ref --depth 1 $dependency.GitUrl $destination
+        if (Test-Path -LiteralPath (Join-Path $destination ".git")) { continue }
+
+        if ($dependency.GitBranch) {
+            git clone --branch $dependency.GitBranch --depth 1 $dependency.GitUrl $destination
             if ($LASTEXITCODE -ne 0) { throw "Failed to clone $($dependency.Name)" }
+        }
+        else {
+            New-Item -ItemType Directory -Path $destination -Force | Out-Null
+            git -C $destination init --quiet
+            if ($LASTEXITCODE -ne 0) { throw "Failed to init $($dependency.Name)" }
+            git -C $destination remote add origin $dependency.GitUrl
+            if ($LASTEXITCODE -ne 0) { throw "Failed to add remote for $($dependency.Name)" }
+            git -C $destination fetch --depth 1 origin $dependency.GitRevision
+            if ($LASTEXITCODE -ne 0) { throw "Failed to fetch $($dependency.Name) at $($dependency.GitRevision)" }
+            git -C $destination checkout --quiet FETCH_HEAD
+            if ($LASTEXITCODE -ne 0) { throw "Failed to check out $($dependency.Name) at $($dependency.GitRevision)" }
         }
     }
 }
@@ -50,14 +65,19 @@ function Invoke-VsDevCmd {
     }
 }
 
-# Swift 5.10.1 ships clang 16, which the 14.40+ STL rejects (STL1000), hence the 14.39 toolset.
+# Versions come from windows-build-pins.json: they are part of the digest the prebuilt archive
+# is named after, so the binaries and the pins cannot drift apart. Swift 5.10.1 ships clang 16,
+# which the 14.40+ STL rejects (STL1000), hence a toolset pinned to 14.39.
 function Initialize-Toolchain {
+    $pinsPath = Join-Path (Split-Path $PSScriptRoot) "windows-build-pins.json"
+    $toolchain = (Get-Content -LiteralPath $pinsPath -Raw | ConvertFrom-Json).toolchain
+
     $swiftRoot = Join-Path $env:LOCALAPPDATA "Programs\Swift"
     $swiftBin = Get-ChildItem -LiteralPath (Join-Path $swiftRoot "Toolchains") -Filter clang-cl.exe -Recurse -File |
         Select-Object -First 1 -ExpandProperty DirectoryName
     if (-not $swiftBin) { throw "Swift clang-cl.exe not found under $swiftRoot" }
-    $msvcBin = "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.39.33519\bin\Hostx64\x64"
-    $windowsSdkBin = "C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64"
+    $msvcBin = "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\$($toolchain.msvcToolset)\bin\Hostx64\x64"
+    $windowsSdkBin = "C:\Program Files (x86)\Windows Kits\10\bin\$($toolchain.windowsSdk)\x64"
     $cmakeBin = "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin"
     $ninjaBin = "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja"
     $env:Path = "$swiftBin;$msvcBin;$windowsSdkBin;$cmakeBin;$ninjaBin;$env:Path"

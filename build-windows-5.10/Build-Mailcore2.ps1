@@ -5,18 +5,7 @@ Param(
     [switch]$Install = $false
 )
 
-# The RD modules are internal. Without them the build falls back to the helper next to this
-# script, so a plain clone of the public repository is enough to build.
-$RequiredRDModules = "RDBuildCMake", "RDBuildMSVC", "RDDependency"
-$MissingRDModules = $RequiredRDModules | Where-Object { -not (Get-Module -ListAvailable $_) }
-if ($MissingRDModules) {
-    . "$PSScriptRoot\Build-Helpers.ps1"
-}
-else {
-    Import-Module RDBuildCMake
-    Import-Module RDBuildMSVC
-    Import-Module RDDependency
-}
+. "$PSScriptRoot\Prebuilt-Common.ps1"
 
 $ProjectRoot = "$(Resolve-Path ""$PSScriptRoot\..\"")"
 if (-Not $DependenciesPath) {
@@ -69,10 +58,13 @@ if (!$PrebuiltDependenciesArchive -and !$S3Key) {
     throw "Spark prebuilt storage key(SPARK_PREBUILT_KEY) is required"
 }
 
+# Pinned to exact commits in windows-build-pins.json: their build outputs ship inside the
+# archive, so a moving branch would silently change what the published binaries contain.
+$Pins = Get-MailcorePins -RepoRoot $ProjectRoot
 $Dependencies = @(
-    @{ Name = "CTemplate"; GitUrl = "https://github.com/readdle/ctemplate.git"; GitBranch = "master"; Directory = $CTemplateDependencyDir; }
-    @{ Name = "LibEtPan"; GitUrl = "https://github.com/readdle/libetpan.git"; GitRevision = "master"; Directory = $LibEtPanDependencyDir; }
-    @{ Name = "Tidy HTML5"; GitUrl = "https://github.com/readdle/tidy-html5.git"; GitBranch = "spark2"; Directory = $TidyDependencyDir; }
+    @{ Name = "CTemplate"; GitUrl = $Pins.dependencies.CTemplate.url; GitRevision = $Pins.dependencies.CTemplate.revision; Directory = $CTemplateDependencyDir; }
+    @{ Name = "LibEtPan"; GitUrl = $Pins.dependencies.LibEtPan.url; GitRevision = $Pins.dependencies.LibEtPan.revision; Directory = $LibEtPanDependencyDir; }
+    @{ Name = "Tidy HTML5"; GitUrl = $Pins.dependencies.TidyHTML5.url; GitRevision = $Pins.dependencies.TidyHTML5.revision; Directory = $TidyDependencyDir; }
 )
 
 Push-Task -Name "mailcore2" -ScriptBlock {

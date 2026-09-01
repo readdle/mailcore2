@@ -31,122 +31,132 @@ Read [instructions for Linux](https://github.com/MailCore/mailcore2/blob/master/
 
 ## Updating mailcore2 on Windows (Spark prebuilt flow) ##
 
-Windows builds of spark-core do **not** compile mailcore2 C++ from source.
-`Build-SparkCore.ps1` clones this repo at a pinned tag and runs
-`build-windows-5.10\Build-SwiftMailcore.ps1`, which compiles only the Swift
-bindings (`src/swift`) and downloads the prebuilt C/C++ libraries
-(`Get-Mailcore2.ps1`, `mailcore2-all-<N>.zip`). The prebuilt archives are
-stored as **GitHub Release assets of this repository** (Releases page of
-`readdle/mailcore2`). **Any C++ change reaches Windows only through a new
-prebuilt archive** — merging a PR or moving a tag is not enough.
+Windows builds of spark-core do **not** compile the mailcore2 C++ from source. They compile
+only the Swift bindings (`src/swift`) and download a prebuilt archive of the C/C++ libraries,
+published as a release asset of this repository.
 
-### Prerequisites ###
+The archive is **named after the content of the sources it was built from**, not after a
+version number:
 
-Everything below is preinstalled in the CI image
-`ghcr.io/readdle/spark-js-addon-windows-builder` — building inside it is the
-easiest path. On a bare machine you need:
+```text
+mailcore2-all-<digest>.zip
+```
 
-- VS2022 Build Tools with an MSVC toolset whose STL accepts the Swift
-  toolchain's clang. Swift 5.10.1 ships clang 16, so the toolset must be
-  **14.39 (17.9) or older** — the 14.40+ STL requires clang 17 and fails with
-  `STL1000`. Install the side-by-side component
-  `Microsoft.VisualStudio.Component.VC.14.39.17.9.x86.x64` and make it the
-  default via `VC\Auxiliary\Build\Microsoft.VCToolsVersion.default.txt` if a
-  newer toolset is also installed.
-- Windows SDK **10.0.18362** (version 1903, from the Windows SDK archive) —
-  the RD build modules pin it when configuring the VS environment.
-- RD PowerShell modules (`RDBuildCMake`, `RDBuildMSVC`, `RDDependency`) in
-  `PSModulePath`.
-- Swift **5.10.1** toolchain (provides `clang-cl` and the Windows SDK with
-  dispatch/BlocksRuntime).
-- ICU 69.1 at `C:\Library\icu-69.1\usr`, libxml2 2.11.5 at
-  `C:\Library\libxml2-2.11.5\usr` (paths are hardcoded in the script).
-- `SPARK_PREBUILT_KEY` env var — download token for
-  `spark-prebuilt-binaries.s3.amazonaws.com` (zlib/sasl/openssl prebuilts).
-- ssh access to `git@github.com:readdle/{ctemplate,libetpan,tidy-html5}`.
+The digest is a hash of git's tree entries for everything that determines the binaries — `src`
+without `src/swift`, `CMakeLists.txt`, and `windows-build-pins.json` (the pinned dependency
+revisions and toolchain). It is computed the same way on every platform: `core.autocrlf` cannot
+change it, because git already stores a hash per blob.
 
-### Build ###
+Two consequences, and they are the whole point:
+
+- **Nothing to bump, nothing to forget.** A change that does not touch the C/C++ sources — a
+  Swift-only fix, a README edit — keeps the same digest and reuses the published archive. No
+  pin, no PR, no tag ordering to get right.
+- **A missing prebuilt cannot pass silently.** There is no Windows CI, so the first thing that
+  notices is the spark-core build, and it stops with:
+
+  ```text
+  Prebuilt MailCore not found: mailcore2-all-<digest>.zip
+  Have you built and uploaded it yet?
+  ```
+
+### Publishing a prebuilt ###
+
+On a Windows machine, in a checkout of this repository at the revision that needs the archive:
 
 ```powershell
-$env:SPARK_PREBUILT_KEY = "<key>"
-powershell -ExecutionPolicy Bypass -File .\build-windows-5.10\Build-Mailcore2.ps1 -Install
+.\build-windows-5.10\Publish-Mailcore2Prebuilt.ps1
 ```
 
-The script clones and builds ctemplate/libetpan/tidy, downloads the binary
-deps, then builds mailcore2/CMailCore with CMake + Ninja using `clang-cl`
-from the Swift toolchain. `-Install` lays the result out in `.build\install`
-(`bin`, `include`, `lib`, `etc`).
+The script computes the digest, exits early if that archive is already published, verifies the
+toolchain against `windows-build-pins.json`, fetches the dependency archive, builds, stamps
+`etc/mailcore2-source-digest` into the install tree, packages `mailcore2-all/`, verifies the
+package (digest, the runtime DLLs, the public headers) and uploads it with `gh`.
 
-- After a **failed** run, delete `.build` before retrying — stale CMake
-  caches keep the old configuration (wrong install prefix, wrong build type)
-  and produce confusing errors.
-- Verify what was built: `type .build\install\etc\mailcore2-git-rev` must be
-  the commit you intend to ship.
+**Nothing is committed to mailcore2 afterwards.** The archive is named after the sources, so
+the revision that needs it finds it. Commit, PR and tag as usual — in any order, at any time.
 
-### Package ###
+Only `-PublishDependenciesArchive <path>` is ever needed besides: the build inputs (ICU 69.1,
+libxml2 2.11.5, openssl, sasl, zlib) are published once as `mailcore2-windows-deps-<n>.zip` and
+change almost never.
 
-The zip must contain a single top-level folder named exactly `mailcore2-all`
-(that is the path `Get-Mailcore2.ps1` extracts):
+### Requirements ###
 
-```powershell
-cd .\.build
-Copy-Item -Recurse install mailcore2-all
-tar -a -cf mailcore2-all-<N+1>.zip mailcore2-all
+Verified on a clean Windows machine. No AWS key, no `C:\Library` layout, no SSH access and no
+internal RD PowerShell modules are required — the repository and every dependency are public,
+and `Build-Helpers.ps1` supplies the RD functions when those modules are absent.
+
+- Windows 10 or 11 x64.
+- Visual Studio 2022 Build Tools with the C++ workload, CMake and Ninja.
+- The versions pinned in `windows-build-pins.json`: MSVC toolset **14.39.33519**, Windows SDK
+  **10.0.26100.0**, Swift **5.10.1** for Windows. The toolset matters: Swift 5.10.1 ships
+  clang 16, and the 14.40+ STL requires clang 17 and fails with `STL1000`. Toolsets install
+  side by side.
+- Git, PowerShell 7 and `gh` authenticated with write access (`winget install --id GitHub.cli`,
+  then `gh auth login`) — for publishing only. Downloading needs no credentials at all.
+
+Changing any pinned version is deliberate: it changes the digest, so every consumer will ask
+for a new archive.
+
+### The dependency archive ###
+
+`mailcore2-windows-deps-<n>.zip` has one top-level directory and this layout:
+
+```text
+mailcore2-windows-deps/
+  icu-69.1/usr/{bin,include,lib/x64}
+  libxml2-2.11.5/usr/{include,lib/x64}
+  openssl/{bin,include,lib64}
+  sasl/{bin,include,lib64}
+  zlib/{include,lib64}
 ```
 
-Sanity check against the current archive: `tar -tf` both files and compare
-the top-level layout.
+How the current one was assembled, in case it ever needs regenerating: ICU 69.1 is the official
+`icu4c-69_1-Win64-MSVC2019.zip` distribution, relaid under `icu-69.1/usr`; libxml2 2.11.5 is
+built from source with CMake/Ninja and MSVC 14.39.33519 (`CMAKE_BUILD_TYPE=Release`,
+`BUILD_SHARED_LIBS=OFF`, and `LIBXML2_WITH_ICONV/ICU/LZMA/MODULES/PROGRAMS/PYTHON/TESTS/ZLIB`
+all `OFF`), installed straight into `libxml2-2.11.5/usr`; openssl, sasl and zlib are the
+previously S3-hosted binary zips, unchanged.
 
-### Upload ###
+### What the archive must contain ###
 
-The archives live as release assets of this repository. Attach the new zip to
-the release that holds the prebuilt binaries (create it from the shipped tag
-with `gh release create` on first use):
+The package step checks this, but when diagnosing a load failure by hand: `bin` must have the
+direct non-system dependencies
 
-```bash
-gh release upload <release-tag> mailcore2-all-<N+1>.zip --repo readdle/mailcore2
+```text
+mailcore2.dll, CMailCore.dll
+libetpan.dll, libctemplate.dll, rdtidy.dll
+libcrypto-1_1-x64.dll, libssl-1_1-x64.dll, zlib.dll, sasl2.dll
+icuuc69.dll, icuin69.dll, icudt69.dll
+dispatch.dll, BlocksRuntime.dll
+msvcp140.dll, vcruntime140.dll (VC143 redistributable)
 ```
 
-Verify the asset is in place and downloadable:
+PDB files stay in the archive: they are needed to symbolicate production crashes.
 
-```bash
-gh release view <release-tag> --repo readdle/mailcore2
-gh release download <release-tag> --pattern "mailcore2-all-<N+1>.zip" --repo readdle/mailcore2 --output /tmp/check.zip
-```
+The build uses the Windows SDK `mt.exe`. Do not replace it with Swift's `llvm-mt`: that one
+depends on libxml2 and fails when the Windows profile path contains non-ASCII characters.
 
-The repository is private, so a plain browser URL needs authentication — the
-build downloads the asset with the token configured for it (see
-`Get-Mailcore2.ps1`). Never delete or overwrite an existing
-`mailcore2-all-<N>.zip` asset — older tags keep downloading it by name.
+### Retention ###
 
-### Switch builds to the new prebuilt ###
+Never delete or overwrite a published `mailcore2-all-<digest>.zip` — revisions built against it
+keep downloading it by name. Re-uploading the same digest after a rebuild is the only
+legitimate replacement, and it is safe by construction: same digest means same sources.
 
-1. In this repo: bump `$PrebuiltMailcoreVersion` in
-   `build-windows-5.10/Get-Mailcore2.ps1` (and make sure its download URL
-   points at the release asset the archive was uploaded to), PR into
-   `spark2`.
-2. Tag the merge with the next `2.1.x` tag. The bump **must be inside the
-   tag** — spark-core runs `Get-Mailcore2.ps1` from its mailcore checkout at
-   that tag, so a tag without the bump silently downloads the previous
-   archive.
-3. In `spark-core-mono`, update every mailcore pin to the new tag — the
-   versions must match across platforms:
-   - `spark-core/build-scripts/Windows-5.10/Build-SparkCore.ps1`
-     (`GitBranch` of the MailCore dependency) — Windows;
-   - `spark-core/Package.swift` and `spark-core/SparkCoreNano/Package.swift`
-     (`.package(... branch:)`) — Mac/Android SPM;
-   - `spark-js-addon/scripts/mac/configure.rb` (`RemoteSwiftPackage`) — the
-     source the addon workspace is generated from;
-   - `spark-js-addon/SparkCoreAddon.xcworkspace/xcshareddata/swiftpm/Package.resolved`
-     — autogenerated from `configure.rb` but tracked in git; update the
-     `branch`/`revision` pair so CI resolves without a regeneration step.
+### Migrating from the S3 flow ###
+
+Archives used to live in the `spark-prebuilt-binaries` S3 bucket, keyed by a version number
+that had to be bumped inside the shipped tag. Tags published that way keep working: they run
+their own copy of `Get-Mailcore2.ps1`. In this revision the S3 path survives only behind
+`-LegacyS3Version <n>`, still requiring `SPARK_PREBUILT_KEY`, and will be removed once the
+Windows build moves to SwiftPM like the other platforms.
 
 ### Local testing without a prebuilt ###
 
-To test unreleased C++ changes, add `-BuildMailcore2` to the
-`Build-SwiftMailcore.ps1` invocation in `Build-SparkCore.ps1` — mailcore2 is
-then compiled from the pinned checkout instead of downloading the archive.
-Slower (~10–15 min extra), for test builds only; remove it before release.
+To test unreleased C++ changes, add `-BuildMailcore2` to the `Build-SwiftMailcore.ps1`
+invocation in `Build-SparkCore.ps1` — mailcore2 is then compiled from the pinned checkout
+instead of downloading the archive. Slower (~10-15 min extra), for test builds only; remove it
+before release.
 
 ## Basic IMAP Usage ##
 
