@@ -5,7 +5,7 @@ Param(
     [switch]$Install = $false
 )
 
-. "$PSScriptRoot\Common.ps1"
+. "$PSScriptRoot\Prebuilt-Common.ps1"
 
 $ProjectRoot = "$(Resolve-Path ""$PSScriptRoot\..\"")"
 if (-Not $DependenciesPath) {
@@ -58,9 +58,9 @@ if (!$PrebuiltDependenciesArchive -and !$S3Key) {
     throw "Spark prebuilt storage key(SPARK_PREBUILT_KEY) is required"
 }
 
-# Pinned to exact commits in pins.json: their build outputs ship inside the
+# Pinned to exact commits in windows-build-pins.json: their build outputs ship inside the
 # archive, so a moving branch would silently change what the published binaries contain.
-$Pins = Get-MailcorePins
+$Pins = Get-MailcorePins -RepoRoot $ProjectRoot
 $Dependencies = @(
     @{ Name = "CTemplate"; GitUrl = $Pins.dependencies.CTemplate.url; GitRevision = $Pins.dependencies.CTemplate.revision; Directory = $CTemplateDependencyDir; }
     @{ Name = "LibEtPan"; GitUrl = $Pins.dependencies.LibEtPan.url; GitRevision = $Pins.dependencies.LibEtPan.revision; Directory = $LibEtPanDependencyDir; }
@@ -116,7 +116,7 @@ Push-Task -Name "mailcore2" -ScriptBlock {
         }
 
         Push-Task -Name "Setup LibEtPan Dependencies" -ScriptBlock {
-            Copy-Item "$ProjectRoot\windows\vs\libetpan\libetpan.vcxproj" -Destination "$LibEtPanDependencyPath\build-windows\libetpan" -Force -ErrorAction Stop
+            Copy-Item "$ProjectRoot\build-windows-5.10\vs\libetpan\libetpan.vcxproj" -Destination "$LibEtPanDependencyPath\build-windows\libetpan" -Force -ErrorAction Stop
 
             $ExternalsPath = "$LibEtPanDependencyPath\third-party"
             if (-Not (Test-Path "$ExternalsPath\include")) {
@@ -140,7 +140,7 @@ Push-Task -Name "mailcore2" -ScriptBlock {
         }
 
         Push-Task -Name "Build CTemplate" -ScriptBlock {
-            Copy-Item -Path "$ProjectRoot\windows\vs\ctemplate\libctemplate.vcxproj" -Destination "$CTemplateDependencyPath\vsprojects\libctemplate" -Force -ErrorAction Stop | Write-Host
+            Copy-Item -Path "$ProjectRoot\build-windows-5.10\vs\ctemplate\libctemplate.vcxproj" -Destination "$CTemplateDependencyPath\vsprojects\libctemplate" -Force -ErrorAction Stop | Write-Host
             MSBuild "$CTemplateDependencyPath\ctemplate.sln" /t:libctemplate /p:Configuration="Release" /p:Platform="x64" /p:DebugSymbols=true /p:DebugType=pdbonly
         }
 
@@ -167,8 +167,8 @@ Push-Task -Name "mailcore2" -ScriptBlock {
             Copy-Item -Path "$TidyDependencyPath\include\*" -Destination "$ExternalsPath\include\tidy" -Recurse -Force -ErrorAction Stop -PassThru | Write-Host
             Copy-Item -Path "$TidyDependencyPath\lib\rdtidy.lib" -Destination "$ExternalsPath\lib64" -Force -ErrorAction Stop -PassThru | Write-Host
 
-            Copy-Item -Path "$ProjectRoot\windows\vs\ctemplate\include\template_cache.h" -Destination "$ExternalsPath\include\ctemplate" -Force -ErrorAction Stop | Write-Host
-            Copy-Item -Path "$ProjectRoot\windows\vs\ctemplate\include\template_string.h" -Destination "$ExternalsPath\include\ctemplate" -Force -ErrorAction Stop | Write-Host
+            Copy-Item -Path "$ProjectRoot\build-windows-5.10\vs\ctemplate\include\template_cache.h" -Destination "$ExternalsPath\include\ctemplate" -Force -ErrorAction Stop | Write-Host
+            Copy-Item -Path "$ProjectRoot\build-windows-5.10\vs\ctemplate\include\template_string.h" -Destination "$ExternalsPath\include\ctemplate" -Force -ErrorAction Stop | Write-Host
         }
 
         if ($Install) {

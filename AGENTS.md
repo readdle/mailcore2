@@ -2,7 +2,7 @@
 
 This is Readdle's fork of MailCore 2. Most of it is the upstream C++ library; the parts we
 maintain are the C wrapper (`src/c`), the Swift bindings (`src/swift`) and the Windows build
-under `windows/`.
+under `build-windows-5.10/`.
 
 MailCore is standalone. How Spark consumes it is Spark's business — the one thing this
 repository owes Windows consumers is a published prebuilt archive for every revision of the
@@ -27,7 +27,7 @@ Windows changes" means.
 You can ask the same question yourself, from anywhere, without a Windows machine:
 
 ```powershell
-pwsh ./windows/Check-PrebuiltPublished.ps1
+pwsh ./build-windows-5.10/Check-PrebuiltPublished.ps1
 ```
 
 ### The whole procedure
@@ -36,11 +36,11 @@ On a Windows machine, in a checkout of this repository **at the revision that ne
 prebuilt** (a branch head, a tag, anything committed):
 
 ```powershell
-.\windows\Publish-Mailcore2Prebuilt.ps1
+.\build-windows-5.10\Publish-Mailcore2Prebuilt.ps1
 ```
 
 That is the entire job. It computes the digest, exits early if that
-archive already exists, verifies the toolchain against `windows\pins.json`, fetches the
+archive already exists, verifies the toolchain against `windows-build-pins.json`, fetches the
 dependency archive, clears the previous install tree, builds, checks the install tree really
 came from the pinned revisions, stamps the digest, packages, verifies the package, and adds it
 to the release.
@@ -57,13 +57,13 @@ missing, say so rather than creating one.
 
 ### Requirements
 
-- Windows machine with the toolchain pinned in `windows\pins.json` (Swift, MSVC toolset,
+- Windows machine with the toolchain pinned in `windows-build-pins.json` (Swift, MSVC toolset,
   Windows SDK). Those versions are not advisory — the build puts exactly them on PATH and
   refuses to run otherwise.
 - `gh` authenticated as a user with write access (`gh auth login`). Nothing else: the
   repository is public, its dependencies are public, and the build needs no AWS key.
 - A committed working tree. The digest describes `HEAD`, so uncommitted changes under `src`
-  (excluding `src/swift`), `CMakeLists.txt` or `windows/pins.json` make the script refuse to
+  (excluding `src/swift`), `CMakeLists.txt` or `windows-build-pins.json` make the script refuse to
   run.
 
 ### When it fails
@@ -71,7 +71,7 @@ missing, say so rather than creating one.
 - *Uncommitted changes under …* — commit them first, or test locally by passing
   `-BuildMailcore2` to `Build-SwiftMailcore.ps1` instead of publishing.
 - *MSVC toolset / Windows SDK / Swift … not found* — the machine does not match the pins.
-  Install the pinned version; toolsets live side by side. Editing `windows\pins.json` to match
+  Install the pinned version; toolsets live side by side. Editing `windows-build-pins.json` to match
   the machine instead is a deliberate act: it changes the digest, so every consumer will need a
   new archive.
 - *The windows-prebuilt release does not exist* — ask the developer; see "The release" below.
@@ -99,7 +99,7 @@ missing, say so rather than creating one.
 
 ### The one thing the digest does not cover
 
-The digest is computed over `src`, `CMakeLists.txt` and `windows/pins.json` — not over the
+The digest is computed over `src`, `CMakeLists.txt` and `windows-build-pins.json` — not over the
 build scripts, so that editing them does not invalidate good binaries. The cost of that choice:
 **a script change that alters what lands in the archive** (adding a DLL to the install step,
 changing an install path) **produces different contents under an unchanged name.** When you
@@ -108,8 +108,8 @@ logging, error messages, refactoring — need nothing.
 
 ## Building without the internal RD modules
 
-`windows\Build-Helpers.ps1` provides the subset of the internal `RDBuildCMake` / `RDBuildMSVC`
-/ `RDDependency` modules that the C/C++ build uses, and `Common.ps1` dot-sources it after
+`build-windows-5.10\Build-Helpers.ps1` provides the subset of the internal `RDBuildCMake` / `RDBuildMSVC`
+/ `RDDependency` modules that the C/C++ build uses, and `Prebuilt-Common.ps1` dot-sources it after
 importing those modules so it wins even where they are installed — the pinned toolchain has to
 be the one that actually runs. A plain clone plus the pinned toolchain is enough to build and
 publish the prebuilt.

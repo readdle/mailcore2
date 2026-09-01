@@ -18,7 +18,7 @@ Param(
 
 $ErrorActionPreference = "Stop"
 
-. "$PSScriptRoot\Common.ps1"
+. "$PSScriptRoot\Prebuilt-Common.ps1"
 
 $ProjectRoot = "$(Resolve-Path ""$PSScriptRoot\..\"")"
 
@@ -109,7 +109,7 @@ if ($baseMoved) {
 else {
     Write-Host "If not: on a Windows machine, in a checkout of this branch," -ForegroundColor Yellow
     Write-Host ""
-    Write-Host "    .\windows\Publish-Mailcore2Prebuilt.ps1"
+    Write-Host "    .\build-windows-5.10\Publish-Mailcore2Prebuilt.ps1"
     Write-Host ""
     Write-Host "and re-run this check. Publishing commits nothing - the archive is named after" -ForegroundColor Yellow
     Write-Host "the sources, so this revision will find it." -ForegroundColor Yellow
@@ -147,7 +147,7 @@ There is no ``$($target.Archive)`` on the [``$Script:MailcorePrebuiltReleaseTag`
 If not, on a Windows machine in a checkout of this branch:
 
 ``````powershell
-.\windows\Publish-Mailcore2Prebuilt.ps1
+.\build-windows-5.10\Publish-Mailcore2Prebuilt.ps1
 ``````
 
 Then re-run this check. Publishing commits nothing to mailcore2 - the archive is named after

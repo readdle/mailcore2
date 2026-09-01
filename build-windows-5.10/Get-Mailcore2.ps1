@@ -6,7 +6,7 @@ Param(
     [string]$InstallPath
 )
 
-. "$PSScriptRoot\Common.ps1"
+. "$PSScriptRoot\Prebuilt-Common.ps1"
 
 $ProjectRoot = "$(Resolve-Path ""$PSScriptRoot\..\"")"
 
@@ -41,7 +41,7 @@ Have you built and uploaded it yet?
 These C/C++ sources (digest $ExpectedDigest) have no published Windows prebuilt.
 In a mailcore2 checkout at this exact revision, on a Windows machine, run:
 
-    .\windows\Publish-Mailcore2Prebuilt.ps1
+    .\build-windows-5.10\Publish-Mailcore2Prebuilt.ps1
 
 Nothing needs to be committed to mailcore2 afterwards - the archive is named after the
 sources, so this revision will find it. To build the C++ from source instead, pass

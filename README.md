@@ -33,8 +33,7 @@ Read [instructions for Linux](https://github.com/MailCore/mailcore2/blob/master/
 
 Windows builds of spark-core do **not** compile the mailcore2 C++ from source. They compile
 only the Swift bindings (`src/swift`) and download a prebuilt archive of the C/C++ libraries,
-published as a release asset of this repository. Everything involved lives in
-[`windows/`](windows).
+published as a release asset of this repository. Everything involved lives in [`build-windows-5.10/`](build-windows-5.10).
 
 The archive is **named after the content of the sources it was built from**, not after a
 version number:
@@ -44,7 +43,7 @@ mailcore2-windows-<digest>.zip
 ```
 
 The digest is a hash of git's tree entries for everything that determines the binaries — `src`
-without `src/swift`, `CMakeLists.txt`, and `windows/pins.json` (the pinned dependency revisions
+without `src/swift`, `CMakeLists.txt`, and `windows-build-pins.json` (the pinned dependency revisions
 and toolchain). It is computed the same way on every platform:
 `core.autocrlf` cannot change it, because git already stores a hash per blob.
 
@@ -66,7 +65,7 @@ Two consequences, and they are the whole point:
 ### The pull-request check ###
 
 `.github/workflows/pull-request-check.yml` runs
-[`windows/Check-PrebuiltPublished.ps1`](windows/Check-PrebuiltPublished.ps1) on every pull
+[`build-windows-5.10/Check-PrebuiltPublished.ps1`](build-windows-5.10/Check-PrebuiltPublished.ps1) on every pull
 request. It builds nothing: the digest is a hash of git tree entries, so a Linux runner
 computes it in seconds and then asks the release whether that archive is there. The answer is
 written to the pull request page, not only into the log.
@@ -96,7 +95,7 @@ Someone with a Windows machine has to build and upload. The whole job is one com
 checkout of this repository at the revision that needs the archive:
 
 ```powershell
-.\windows\Publish-Mailcore2Prebuilt.ps1
+.\build-windows-5.10\Publish-Mailcore2Prebuilt.ps1
 ```
 
 That is also all an agent needs to be told — "build and upload the Windows prebuilt for this
@@ -105,23 +104,23 @@ revision". [AGENTS.md](AGENTS.md) carries the procedure, the failure modes and t
 needs to be pushed for it to turn green.
 
 It computes the digest, exits early if that archive is already published, verifies the
-toolchain against `windows/pins.json`, fetches the dependency archive, clears the previous
+toolchain against `windows-build-pins.json`, fetches the dependency archive, clears the previous
 install tree, builds, checks the install tree really came from the pinned revisions, stamps
 `etc/mailcore2-source-digest`, packages, verifies, and adds it to the release.
 
 Commit, PR and tag as usual — in any order, at any time. The archive is named after the
 sources, so the revision that needs it finds it.
 
-### What is in `windows/` ###
+### What is in `build-windows-5.10/` ###
 
 | | |
 |---|---|
-| `pins.json` | Everything besides the C/C++ sources that determines the binaries. Part of the digest. |
+| `../windows-build-pins.json` | Everything besides the C/C++ sources that determines the binaries. Part of the digest. |
 | `Publish-Mailcore2Prebuilt.ps1` | Build + verify + add to the release. The one command that matters. |
 | `Get-Mailcore2.ps1` | Downloads the archive for the current sources. Called by the Swift build. |
 | `Build-Mailcore2.ps1` | Builds the C/C++ from source. |
 | `Build-SwiftMailcore.ps1` | Builds `src/swift` on top of either of the two. spark-core's entry point. |
-| `Build-Helpers.ps1`, `Common.ps1` | Digest, archive naming, and stand-ins for the internal RD modules. |
+| `Build-Helpers.ps1`, `Prebuilt-Common.ps1` | Digest, archive naming, and stand-ins for the internal RD modules. |
 | `Check-PrebuiltPublished.ps1` | Asks whether these sources have a published archive. The pull-request check. |
 | `bin/`, `vs/`, `mailcore2/` | Redistributables and the Visual Studio project files. |
 
@@ -133,7 +132,7 @@ the pins says which version it is missing and stops.
 
 - Windows 10 or 11 x64, PowerShell 7, Git.
 - Visual Studio 2022 Build Tools with the C++ workload, CMake and Ninja.
-- The versions pinned in `windows/pins.json`: MSVC toolset **14.39.33519**, Windows SDK
+- The versions pinned in `windows-build-pins.json`: MSVC toolset **14.39.33519**, Windows SDK
   **10.0.26100.0**, Swift **5.10.1** for Windows. The toolset matters: Swift 5.10.1 ships
   clang 16, and the 14.40+ STL requires clang 17 and fails with `STL1000`. Toolsets install
   side by side, and the build puts the pinned one on PATH rather than whatever is default.
@@ -223,10 +222,7 @@ automatically. Slower (~10-15 min extra), for test builds only; remove it before
 ### History ###
 
 Archives used to live in the `spark-prebuilt-binaries` S3 bucket, keyed by a version number
-that had to be bumped inside the shipped tag, and the scripts lived in `build-windows-5.10/`.
-Anything outside this repository that invoked them by path — `Build-SparkCore.ps1` in
-spark-core-mono calls `Build-SwiftMailcore.ps1` — needs the new `windows/` path, and only from
-the tag that first contains this change.
+that had to be bumped inside the shipped tag, and the scripts have not moved.
 Tags published that way keep working — they run their own copy of `Get-Mailcore2.ps1` from
 their own checkout — but this revision no longer has an S3 path at all. The whole arrangement
 goes away when the Windows build moves to SwiftPM like the other platforms.

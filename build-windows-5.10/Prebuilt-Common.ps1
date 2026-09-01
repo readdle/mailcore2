@@ -22,11 +22,13 @@ else {
 }
 
 function Get-MailcorePinsPath {
-    return (Join-Path $PSScriptRoot "pins.json")
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+    return (Join-Path $RepoRoot "windows-build-pins.json")
 }
 
 function Get-MailcorePins {
-    $path = Get-MailcorePinsPath
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+    $path = Get-MailcorePinsPath -RepoRoot $RepoRoot
     if (-not (Test-Path -LiteralPath $path)) { throw "Build pins not found: $path" }
     return Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
 }
@@ -36,7 +38,7 @@ function Get-MailcorePins {
 # dependencies and the toolchain. Deliberately NOT the build scripts - editing them would
 # invalidate perfectly good binaries.
 function Get-MailcoreDigestPathSpec {
-    return @("src", "CMakeLists.txt", "windows/pins.json")
+    return @("src", "CMakeLists.txt", "windows-build-pins.json")
 }
 
 # A digest of git's own tree entries, not of file bytes: git already stores a hash per blob, so

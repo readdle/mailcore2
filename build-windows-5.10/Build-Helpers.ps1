@@ -65,11 +65,11 @@ function Invoke-VsDevCmd {
     }
 }
 
-# Versions come from pins.json: they are part of the digest the prebuilt archive is named after,
-# so the binaries and the pins cannot drift apart. Swift 5.10.1 ships clang 16, which the 14.40+
-# STL rejects (STL1000), hence a toolset pinned to 14.39.
+# Versions come from windows-build-pins.json: they are part of the digest the prebuilt archive
+# is named after, so the binaries and the pins cannot drift apart. Swift 5.10.1 ships clang 16,
+# which the 14.40+ STL rejects (STL1000), hence a toolset pinned to 14.39.
 function Initialize-Toolchain {
-    $pinsPath = Join-Path $PSScriptRoot "pins.json"
+    $pinsPath = Join-Path (Split-Path $PSScriptRoot) "windows-build-pins.json"
     $toolchain = (Get-Content -LiteralPath $pinsPath -Raw | ConvertFrom-Json).toolchain
 
     $swiftRoot = Join-Path $env:LOCALAPPDATA "Programs\Swift"

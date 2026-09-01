@@ -82,7 +82,7 @@ jobs:
       shell: pwsh
       env:
         GH_TOKEN: ${{ github.token }}
-      run: ./windows/Check-PrebuiltPublished.ps1
+      run: ./build-windows-5.10/Check-PrebuiltPublished.ps1
 
   Darwin:
     name: "mailcore2 - ${{ matrix.os }}"

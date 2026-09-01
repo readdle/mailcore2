@@ -10,7 +10,7 @@ Param(
 
 $ErrorActionPreference = "Stop"
 
-. "$PSScriptRoot\Common.ps1"
+. "$PSScriptRoot\Prebuilt-Common.ps1"
 
 $ProjectRoot = "$(Resolve-Path ""$PSScriptRoot\..\"")"
 if (-Not $WorkPath) {
@@ -44,7 +44,7 @@ if (-not $SkipUpload) {
     Assert-MailcorePrebuiltRelease
 }
 
-$Pins = Get-MailcorePins
+$Pins = Get-MailcorePins -RepoRoot $ProjectRoot
 
 # Throws when the digested paths are dirty: the archive must correspond to a committed state.
 $Digest = Get-MailcoreSourceDigest -RepoRoot $ProjectRoot
@@ -64,18 +64,18 @@ if ($AlreadyPublished -and -not $Force) {
     return
 }
 
-Push-Task -Name "Verify toolchain against windows\pins.json" -ScriptBlock {
+Push-Task -Name "Verify toolchain against windows-build-pins.json" -ScriptBlock {
     $toolsetRoot = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\$($Pins.toolchain.msvcToolset)"
     if (-not (Test-Path -LiteralPath $toolsetRoot)) {
-        throw "MSVC toolset $($Pins.toolchain.msvcToolset) not found at $toolsetRoot. Install it, or update windows\pins.json (which changes the digest and therefore the archive name)."
+        throw "MSVC toolset $($Pins.toolchain.msvcToolset) not found at $toolsetRoot. Install it, or update windows-build-pins.json (which changes the digest and therefore the archive name)."
     }
     $sdkRoot = "${env:ProgramFiles(x86)}\Windows Kits\10\bin\$($Pins.toolchain.windowsSdk)"
     if (-not (Test-Path -LiteralPath $sdkRoot)) {
-        throw "Windows SDK $($Pins.toolchain.windowsSdk) not found at $sdkRoot. Install it, or update windows\pins.json."
+        throw "Windows SDK $($Pins.toolchain.windowsSdk) not found at $sdkRoot. Install it, or update windows-build-pins.json."
     }
     $swiftPlatform = Join-Path $env:LOCALAPPDATA "Programs\Swift\Platforms\$($Pins.toolchain.swift)"
     if (-not (Test-Path -LiteralPath $swiftPlatform)) {
-        throw "Swift $($Pins.toolchain.swift) not found at $swiftPlatform. Install it, or update windows\pins.json."
+        throw "Swift $($Pins.toolchain.swift) not found at $swiftPlatform. Install it, or update windows-build-pins.json."
     }
     if (-not $env:SDKROOT) {
         $env:SDKROOT = Join-Path $swiftPlatform "Windows.platform\Developer\SDKs\Windows.sdk"
@@ -149,7 +149,7 @@ Push-Task -Name "Stamp source digest" -ScriptBlock {
         if (-not (Test-Path -LiteralPath $stampPath)) { throw "The install tree has no $($entry.Key)" }
         $actual = (Get-Content -LiteralPath $stampPath -Raw).Trim()
         if ($actual -ne $entry.Value) {
-            throw "$($entry.Key) is $actual but pins.json and the checkout say $($entry.Value). Delete $DependenciesPath and re-run."
+            throw "$($entry.Key) is $actual but windows-build-pins.json and the checkout say $($entry.Value). Delete $DependenciesPath and re-run."
         }
     }
 }
