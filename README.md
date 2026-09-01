@@ -78,6 +78,11 @@ result does not — the check says so and tells you to rebase, rather than leavi
 A pull request that does not touch the C/C++ sources keeps the same digest and goes green
 without anyone doing anything, which is the point of naming archives after content.
 
+The check is only advisory until `mailcore2 - Windows prebuilt` is added to the branch
+protection rules for `spark2`. Worth waiting until the first archive has been published:
+before that there is no release at all, so every pull request touching the C/C++ goes red,
+correctly but uselessly.
+
 ### What to do when it is red ###
 
 Someone with a Windows machine has to build and upload. The whole job is two commands, in a
@@ -120,9 +125,9 @@ sources, so the revision that needs it finds it.
 
 ### Requirements ###
 
-Verified on a clean Windows machine, and checked by `Setup-Machine.ps1`. No AWS key, no
-`C:\Library` layout and no SSH access are required — the repository and every dependency are
-public.
+All of it is checked by `Setup-Machine.ps1`, which changes nothing unless given `-Install`. No
+AWS key, no `C:\Library` layout and no SSH access are required — the repository and every
+dependency are public.
 
 - Windows 10 or 11 x64, PowerShell 7, Git.
 - Visual Studio 2022 Build Tools with the C++ workload, CMake and Ninja.
@@ -212,6 +217,9 @@ automatically. Slower (~10-15 min extra), for test builds only; remove it before
 
 Archives used to live in the `spark-prebuilt-binaries` S3 bucket, keyed by a version number
 that had to be bumped inside the shipped tag, and the scripts lived in `build-windows-5.10/`.
+Anything outside this repository that invoked them by path — `Build-SparkCore.ps1` in
+spark-core-mono calls `Build-SwiftMailcore.ps1` — needs the new `windows/` path, and only from
+the tag that first contains this change.
 Tags published that way keep working — they run their own copy of `Get-Mailcore2.ps1` from
 their own checkout — but this revision no longer has an S3 path at all. The whole arrangement
 goes away when the Windows build moves to SwiftPM like the other platforms.

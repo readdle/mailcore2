@@ -13,6 +13,10 @@ $ErrorActionPreference = "Stop"
 
 . "$PSScriptRoot\Common.ps1"
 
+if (-not $IsWindows) {
+    throw "This checks a Windows build machine. To ask whether a prebuilt is published - which needs no Windows - run Check-PrebuiltPublished.ps1 instead."
+}
+
 $Pins = Get-MailcorePins
 $VsBuildTools = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\BuildTools"
 $SwiftRoot = Join-Path $env:LOCALAPPDATA "Programs\Swift"
@@ -48,6 +52,10 @@ function Test-Tool {
 Write-Host ""
 Write-Host "Checking against $(Get-MailcorePinsPath)" -ForegroundColor Cyan
 Write-Host ""
+
+Add-Check -Name "PowerShell 7+" -Detail $PSVersionTable.PSVersion.ToString() `
+    -Ok ($PSVersionTable.PSVersion.Major -ge 7) `
+    -Fix "winget install --id Microsoft.PowerShell --accept-package-agreements --accept-source-agreements"
 
 Test-Tool -Name "git"        -Command "git"  -Fix "winget install --id Git.Git --accept-package-agreements --accept-source-agreements"
 Test-Tool -Name "GitHub CLI" -Command "gh"   -Fix "winget install --id GitHub.cli --accept-package-agreements --accept-source-agreements"
