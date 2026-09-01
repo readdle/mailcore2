@@ -26,6 +26,27 @@ public class MCOIMAPBaseOperation : MCOOperation {
     internal func error() -> ErrorCode {
         return baseOperation.error()
     }
+
+    /**
+     Aborts this operation's IMAP command if it is the one currently running on its connection: the
+     blocked read returns at once instead of waiting out the socket timeout, so whatever is queued
+     behind it - a disconnect, above all - runs immediately. Does nothing when this operation is not
+     the one running.
+
+     Unlike cancel(), which only raises a flag mailcore checks before starting an operation, this
+     reaches the command already in flight. It costs the connection: the stream stays cancelled and
+     is rebuilt on next use, so call it for a command being abandoned, never to hurry up one whose
+     result still matters.
+
+     - Returns: whether a command was actually interrupted, i.e. whether this operation was the one
+     running. `false` means nothing was holding the connection on its behalf.
+     */
+    @discardableResult
+    public func interruptCurrentCommand() -> Bool {
+        return mailCoreAutoreleasePool {
+            baseOperation.interruptCurrentCommand()
+        }
+    }
     
     public func itemProgress(current: UInt32, maximum: UInt32) {
         

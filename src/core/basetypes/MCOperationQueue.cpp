@@ -32,6 +32,7 @@ OperationQueue::OperationQueue()
     mStopSem = mailsem_new();
     mWaitingFinishedSem = mailsem_new();
     mQuitting = false;
+    mRunningOperation = NULL;
     mCallback = NULL;
 #if MC_HAS_GCD
     mDispatchQueue = getMainQueue();
@@ -61,6 +62,26 @@ void OperationQueue::addOperation(Operation * op)
 	MCB_UNLOCK(&mLock);
     mailsem_up(mOperationSem);
     startThread();
+}
+
+bool OperationQueue::interruptRunningOperation(Operation * op)
+{
+    bool interrupted = false;
+
+    // interrupt() runs with the lock held on purpose: releasing it first would let the next
+    // operation start before the interruption lands, and it would be that one getting cut. The
+    // lock cannot keep op itself from finishing - main() runs without it - so an interrupt may
+    // still arrive just after the command completed; that costs a reconnect, nothing worse.
+    // Safe as long as interrupt() implementations stay non-blocking and never reach back into
+    // this queue.
+    MCB_LOCK(&mLock);
+    if ((op != NULL) && (mRunningOperation == op)) {
+        op->interrupt();
+        interrupted = true;
+    }
+    MCB_UNLOCK(&mLock);
+
+    return interrupted;
 }
 
 void OperationQueue::cancelAllOperations()
@@ -122,13 +143,20 @@ void OperationQueue::runOperations()
         MCAssert(op != NULL);
         performOnCallbackThread(op, (Object::Method) &OperationQueue::beforeMain, op, true);
         
+        // Published only around main(): a cancelled operation whose main() is skipped never counts
+        // as running, so nobody can mistake an idle connection for a busy one.
         if (!op->isCancelled() || op->shouldRunWhenCancelled()) {
+            MCB_LOCK(&mLock);
+            mRunningOperation = op;
+            MCB_UNLOCK(&mLock);
+
             op->main();
         }
         
         op->retain()->autorelease();
         
 		MCB_LOCK(&mLock);
+        mRunningOperation = NULL;
         mOperations->removeObjectAtIndex(0);
         if (mOperations->count() == 0) {
             if (mWaiting) {
