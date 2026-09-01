@@ -1,6 +1,4 @@
 Param(
-    # Local copy of the dependency archive. Downloaded from the release when omitted.
-    [string]$PrebuiltDependenciesArchive,
     [string]$WorkPath,
     # Rebuild and overwrite an archive that is already published. Same digest means the same
     # sources, so this replaces like with like.
@@ -72,10 +70,6 @@ $ArchivePath = "$WorkPath\$ArchiveName"
 
 New-Item -ItemType Directory -Path $WorkPath -Force | Out-Null
 
-if (-not $PrebuiltDependenciesArchive) {
-    $PrebuiltDependenciesArchive = Get-MailcoreDependenciesArchive -WorkPath $WorkPath
-}
-
 # --- Build ------------------------------------------------------------------------------------
 
 # A publish must package only what this build produced. The CMake binary directory matters as
@@ -95,7 +89,6 @@ Push-Task -Name "Build mailcore2" -ScriptBlock {
     & "$PSScriptRoot\Build-Mailcore2.ps1" `
         -DependenciesPath $DependenciesPath `
         -InstallPath $InstallPath `
-        -PrebuiltDependenciesArchive $PrebuiltDependenciesArchive `
         -Install
 }
 

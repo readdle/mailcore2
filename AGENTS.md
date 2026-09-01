@@ -71,7 +71,7 @@ to run.
 - *The windows-prebuilt release does not exist* — ask the developer; see "The release" above.
 - *Could not download the dependency archive* — `mailcore2-windows-deps-<n>.zip` carries
   openssl, sasl and zlib and is attached to the release by hand. If it is not there, ask the
-  developer to attach it, or point at a local copy with `-PrebuiltDependenciesArchive <path>`.
+  developer to attach it. The message names the path a local copy can be dropped at instead.
 - *GitHub CLI is not authenticated* — `gh auth login`. Do not work around this with a token
   pasted into the shell.
 - Anything about ICU, libxml2 or the toolchain — that is the build machine's setup, unchanged by

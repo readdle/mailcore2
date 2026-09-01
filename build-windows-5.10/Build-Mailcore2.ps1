@@ -1,8 +1,6 @@
 Param(
     [string]$DependenciesPath,
     [string]$InstallPath,
-    # Local copy of the dependency archive. Downloaded from the release when omitted.
-    [string]$PrebuiltDependenciesArchive,
     [switch]$Install = $false
 )
 
@@ -45,11 +43,6 @@ $ZlibDependencyPath = "$PrebuiltDependenciesRoot\zlib"
 $SaslDependencyPath = "$PrebuiltDependenciesRoot\sasl"
 $OpenSslDependencyPath = "$PrebuiltDependenciesRoot\openssl"
 
-if ($PrebuiltDependenciesArchive) {
-    # Resolved before anything changes the working directory.
-    $PrebuiltDependenciesArchive = "$(Resolve-Path $PrebuiltDependenciesArchive)"
-}
-
 $Dependencies = @(
     @{ Name = "CTemplate"; GitUrl = "git@github.com:readdle/ctemplate.git"; GitBranch = "master"; Directory = $CTemplateDependencyDir; }
     @{ Name = "LibEtPan"; GitUrl = "git@github.com:readdle/libetpan.git"; GitRevision = "master"; Directory = $LibEtPanDependencyDir; }
@@ -71,10 +64,7 @@ Push-Task -Name "mailcore2" -ScriptBlock {
 
         Initialize-Dependencies -Path $Script:DependenciesPath -Dependencies $Script:Dependencies
         Push-Task -Name "Fetch binary dependencies" -ScriptBlock {
-            $archive = $PrebuiltDependenciesArchive
-            if (-not $archive) {
-                $archive = Get-MailcoreDependenciesArchive -WorkPath $DependenciesPath
-            }
+            $archive = Get-MailcoreDependenciesArchive -WorkPath $DependenciesPath
             # A tree left by an older archive must not survive: files it no longer contains
             # would otherwise still be picked up.
             if (Test-Path -LiteralPath $PrebuiltDependenciesRoot) {

@@ -151,7 +151,7 @@ function Get-MailcoreDependenciesArchive {
 Could not download the dependency archive $name from $url
 
 It carries openssl, sasl and zlib, and is attached to the $Script:MailcorePrebuiltReleaseTag
-release by hand, once. Attach it, or pass -PrebuiltDependenciesArchive <path> to use a local copy.
+release by hand, once. Attach it, or drop a copy at $path and it will be used as is.
 
 Download error: $($_.Exception.Message)
 "@
