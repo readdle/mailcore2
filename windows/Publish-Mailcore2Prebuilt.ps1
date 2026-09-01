@@ -30,9 +30,7 @@ function Assert-GitHubCli {
     }
 }
 
-# Adds one asset to the release. Never creates it: the release and the dependency archive are
-# set up once by hand, and a script that quietly recreated a deleted release would hide the
-# fact that every archive on it had gone with it.
+# Adds one asset to the release, which is set up once by hand and never created here.
 function Publish-ReleaseAsset {
     param([Parameter(Mandatory = $true)][string]$Path, [switch]$Clobber)
     Assert-MailcorePrebuiltRelease

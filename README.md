@@ -85,18 +85,10 @@ correctly but uselessly.
 
 ### The release, set up once ###
 
-`windows-prebuilt` is a container for binaries, not a code release. It is created by hand, one
-time, and the dependency archive is attached to it by hand, one time:
-
-1. [Create the release](https://github.com/readdle/mailcore2/releases/new?tag=windows-prebuilt)
-   with tag `windows-prebuilt`, marked as a pre-release.
-2. Attach `mailcore2-windows-deps-1.zip` to it.
-
-From then on `Publish-Mailcore2Prebuilt.ps1` only adds `mailcore2-all-<digest>.zip` archives to
-it. Nothing in `windows/` creates the release, attaches the dependency archive, or deletes
-anything — a script that quietly recreated a deleted release would hide the fact that every
-archive on it had gone too. When the release is missing, the publish script and the
-pull-request check both stop and say so.
+The archives live on a permanent [`windows-prebuilt`](https://github.com/readdle/mailcore2/releases/tag/windows-prebuilt)
+release — a container for binaries, not a code release. Created by hand, one time:
+tag `windows-prebuilt`, marked as a pre-release, with `mailcore2-windows-deps-1.zip` attached.
+`Publish-Mailcore2Prebuilt.ps1` then only adds `mailcore2-all-<digest>.zip` archives to it.
 
 ### What to do when it is red ###
 

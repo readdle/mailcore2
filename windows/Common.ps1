@@ -103,21 +103,15 @@ function Get-MailcoreArchiveDigest {
 
 # --- The release ------------------------------------------------------------------------------
 
-# The release is a container for binaries, not a code release, and it is set up once by hand:
-# nothing in this directory creates it or attaches the dependency archive to it. The scripts
-# only ever add mailcore2-all-<digest>.zip archives to a release that is already there.
+# The release is a permanent container for binaries, set up once by hand. The scripts only add
+# archives to it.
 $Script:MailcoreReleaseSetupHelp = @"
 The $Script:MailcorePrebuiltReleaseTag release does not exist, or is not visible to this token.
-
 It is created once, by hand:
 
   1. https://github.com/$Script:MailcorePrebuiltRepo/releases/new?tag=$Script:MailcorePrebuiltReleaseTag
-     Tag: $Script:MailcorePrebuiltReleaseTag. Tick "Set as a pre-release" - it is a container
-     for binaries, not a code release.
-  2. Attach the dependency archive to it, also once. It carries the binary build inputs
-     (ICU, libxml2, openssl, sasl, zlib) and changes almost never.
-
-From then on the scripts only add archives to it; they never create or delete it.
+     Tag $Script:MailcorePrebuiltReleaseTag, marked as a pre-release.
+  2. Attach the dependency archive to it, under the name pins.json gives it.
 "@
 
 function Test-MailcorePrebuiltRelease {
@@ -219,9 +213,8 @@ function Get-MailcoreDependenciesArchive {
 Could not download the dependency archive $name from $url
 
 It carries the binary build inputs (ICU, libxml2, openssl, sasl, zlib) and is attached to the
-$Script:MailcorePrebuiltReleaseTag release once, by hand - no script uploads it. Attach it, or
-pass a local copy with -PrebuiltDependenciesArchive <path>. To rebuild it from scratch, see
-.\windows\New-DependenciesArchive.ps1.
+$Script:MailcorePrebuiltReleaseTag release once, by hand. Attach it, or pass a local copy with
+-PrebuiltDependenciesArchive <path>. New-DependenciesArchive.ps1 rebuilds it from scratch.
 
 Download error: $($_.Exception.Message)
 "@
