@@ -1,0 +1,119 @@
+# Working in this repository
+
+This is Readdle's fork of MailCore 2. Most of it is the upstream C++ library; the parts we
+maintain are the C wrapper (`src/c`), the Swift bindings (`src/swift`) and the Windows build
+under `build-windows-5.10/`.
+
+MailCore is standalone. How Spark consumes it is Spark's business — the one thing this
+repository owes Windows consumers is a published prebuilt archive for every revision of the
+C/C++ sources that needs one.
+
+## Publishing the Windows prebuilt
+
+Spark's Windows build does not compile the mailcore2 C++ from source. It downloads an archive
+whose name is derived from the content of the C/C++ sources, so **sources that were never built
+simply have no archive** and the Spark build says so:
+
+```
+Prebuilt MailCore not found: mailcore2-windows-<digest>.zip
+Have you built and uploaded it yet?
+```
+
+There is no Windows CI. The `mailcore2 - Windows prebuilt` pull-request check asks the same
+question earlier, on every pull request, and goes red when the answer is no. Either way,
+someone has to build and publish from a Windows machine — that is what "build and upload the
+Windows changes" means.
+
+You can ask the same question yourself, from anywhere, without a Windows machine:
+
+```powershell
+pwsh ./build-windows-5.10/Check-PrebuiltPublished.ps1
+```
+
+### The whole procedure
+
+On a Windows machine, in a checkout of this repository **at the revision that needs the
+prebuilt** (a branch head, a tag, anything committed):
+
+```powershell
+.\build-windows-5.10\Publish-Mailcore2Prebuilt.ps1
+```
+
+That is the entire job. It computes the digest, exits early if that
+archive already exists, verifies the toolchain against `windows-build-pins.json`, fetches the
+dependency archive, clears the previous install tree, builds, checks the install tree really
+came from the pinned revisions, stamps the digest, packages, verifies the package, and adds it
+to the release.
+
+**Do not commit anything to mailcore2 afterwards.** The archive is named after the sources, so
+the revision that needs it will find it. Committing, opening the PR and tagging are the
+developer's job, not the agent's.
+
+### The release
+
+Archives live on the permanent `windows-prebuilt` release, set up by hand once.
+`Publish-Mailcore2Prebuilt.ps1` only adds `mailcore2-windows-<digest>.zip` to it. If it is somehow
+missing, say so rather than creating one.
+
+### Requirements
+
+- Windows machine with the toolchain pinned in `windows-build-pins.json` (Swift, MSVC toolset,
+  Windows SDK). Those versions are not advisory — the build puts exactly them on PATH and
+  refuses to run otherwise.
+- `gh` authenticated as a user with write access (`gh auth login`). Nothing else: the
+  repository is public, its dependencies are public, and the build needs no AWS key.
+- A committed working tree. The digest describes `HEAD`, so uncommitted changes under `src`
+  (excluding `src/swift`), `CMakeLists.txt` or `windows-build-pins.json` make the script refuse to
+  run.
+
+### When it fails
+
+- *Uncommitted changes under …* — commit them first, or test locally by passing
+  `-BuildMailcore2` to `Build-SwiftMailcore.ps1` instead of publishing.
+- *MSVC toolset / Windows SDK / Swift … not found* — the machine does not match the pins.
+  Install the pinned version; toolsets live side by side. Editing `windows-build-pins.json` to match
+  the machine instead is a deliberate act: it changes the digest, so every consumer will need a
+  new archive.
+- *The windows-prebuilt release does not exist* — ask the developer; see "The release" below.
+- *Could not download the dependency archive* — the build inputs (ICU, libxml2, openssl, sasl,
+  zlib) live on the release as `mailcore2-windows-deps-<n>.zip`. If it is not there, ask the
+  developer to attach it, or point at a local copy with `-PrebuiltDependenciesArchive <path>`.
+  How the current one was assembled is in the README, should it ever need regenerating.
+- *GitHub CLI is not authenticated* — `gh auth login`. Do not work around this with a token
+  pasted into the shell.
+- *`<name>-git-rev` is X but pins.json says Y* — a dependency checkout left over from an older
+  pin. `Initialize-Dependencies` never updates an existing clone, so delete
+  `.build\prebuilt\build-dependencies` and re-run.
+- *The pull-request check is red but the branch head was published* — the base branch moved, so
+  the merge result is different sources. Rebase onto the base branch and publish again. The
+  check says which archive it wanted and which one exists.
+
+### What not to do
+
+- Do not edit the archive by hand or upload one built from an uncommitted tree.
+- Do not delete a published `mailcore2-windows-<digest>.zip`: revisions that were built against it
+  keep downloading it by name. Re-uploading the *same* digest after a rebuild is the only
+  legitimate replacement, and `-Force` exists for exactly that.
+- Do not add a version number anywhere. The digest replaced it; there is nothing to bump.
+- Do not create the release or attach the dependency archive. Both are the developer's.
+
+### The one thing the digest does not cover
+
+The digest is computed over `src`, `CMakeLists.txt` and `windows-build-pins.json` — not over the
+build scripts, so that editing them does not invalidate good binaries. The cost of that choice:
+**a script change that alters what lands in the archive** (adding a DLL to the install step,
+changing an install path) **produces different contents under an unchanged name.** When you
+make such a change, re-publish the affected archives with `-Force`. Ordinary script edits —
+logging, error messages, refactoring — need nothing.
+
+## Building without the internal RD modules
+
+`build-windows-5.10\Build-Helpers.ps1` provides the subset of the internal `RDBuildCMake` /
+`RDBuildMSVC` / `RDDependency` modules that the C/C++ build uses. `Prebuilt-Common.ps1` loads one
+or the other, not both: the real modules when they are installed, these stand-ins when they are
+not. So a plain clone plus the pinned toolchain is enough to build and publish the prebuilt,
+while the CI image keeps using the real modules.
+
+The Swift build (`Build-SwiftMailcore.ps1`) is the exception: `Initialize-SDK` and
+`Invoke-BuildModuleTarget` are not reimplemented, so that script still needs the real RD
+modules. It runs inside the Spark CI image, which has them.
