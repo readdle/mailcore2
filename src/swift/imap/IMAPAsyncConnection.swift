@@ -30,6 +30,16 @@ public class MCOIMAPAsyncConnection: NSObjectCompat {
         return connection.isReserved
     }
 
+    /**
+     Stable identity of the underlying pool connection, unique and constant for the lifetime of
+     the owning MCOIMAPSession (its pool is never pruned). Two MCOIMAPAsyncConnection wrappers
+     from separate acquisitions compare equal here when they lease the same connection — use it
+     to key per-connection bookkeeping such as view-freshness generations.
+     */
+    public var identity: UInt {
+        return UInt(bitPattern: connection.instance)
+    }
+
     /** Number of operations queued on this connection. */
     public var operationsCount: UInt32 {
         return connection.operationsCount
