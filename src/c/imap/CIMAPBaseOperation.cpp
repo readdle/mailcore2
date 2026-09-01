@@ -49,6 +49,8 @@ ErrorCode CIMAPBaseOperation_error(struct CIMAPBaseOperation self) {
     return static_cast<ErrorCode>(self.instance->error());
 }
 
+C_SYNTHESIZE_FUNC_WITH_SCALAR(bool, interruptCurrentCommand)
+
 CIMAPBaseOperation CIMAPBaseOperation_setProgressBlocks(struct CIMAPBaseOperation self, CIMAPProgressBlock itemProgressBlock, CIMAPProgressBlock bodyProgressBlock, const void* userInfo) {
     CIMAPBaseOperationIMAPCallback *callback = new CIMAPBaseOperationIMAPCallback(userInfo, itemProgressBlock, bodyProgressBlock);
     self._callback = callback;

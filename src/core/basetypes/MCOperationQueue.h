@@ -21,6 +21,14 @@ namespace mailcore {
         
         virtual void addOperation(Operation * op);
         virtual void cancelAllOperations();
+
+        /** Calls interrupt() on `op` if it is the operation whose main() the queue is executing
+         right now. The check and the call happen under the queue's lock, so the operation cannot
+         finish - and another one cannot take over the resource - in between.
+         Lets a caller abort "the command my operation is running" without the risk of aborting
+         whatever started after it. Returns whether interrupt() was called - a caller that measures
+         the effect needs to tell "there was a command to break" from "there was nothing". */
+        virtual bool interruptRunningOperation(Operation * op);
         
         virtual unsigned int count();
         
@@ -45,6 +53,7 @@ namespace mailcore {
         bool mWaiting;
         struct mailsem * mWaitingFinishedSem;
         bool mQuitting;
+        Operation * mRunningOperation;
         OperationQueueCallback * mCallback;
 #if MC_HAS_GCD
         dispatch_queue_t mDispatchQueue;

@@ -35,6 +35,7 @@ extern "C" {
     C_SYNTHESIZE_COBJECT_CAST_DEFINITION(CIMAPBaseOperation)
     
     C_SYNTHESIZE_FUNC_DEFINITION(CIMAPBaseOperation, ErrorCode, error)
+    C_SYNTHESIZE_FUNC_DEFINITION(CIMAPBaseOperation, bool, interruptCurrentCommand)
     C_SYNTHESIZE_FUNC_DEFINITION(CIMAPBaseOperation, CIMAPBaseOperation, setProgressBlocks, CIMAPProgressBlock, CIMAPProgressBlock, const void*)
     
     CMAILCORE_EXPORT void       CIMAPBaseOperation_retain(CIMAPBaseOperation operation)

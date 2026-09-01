@@ -43,6 +43,11 @@ void Operation::cancel()
 	MCB_UNLOCK(&mLock);
 }
 
+void Operation::interrupt()
+{
+    // Nothing to interrupt by default.
+}
+
 bool Operation::isCancelled()
 {
 	MCB_LOCK(&mLock);

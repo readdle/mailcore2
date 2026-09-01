@@ -3699,6 +3699,19 @@ void IMAPSession::disconnect()
     unsetup();
 }
 
+void IMAPSession::interruptCurrentCommand()
+{
+    // mailstream_cancel() must be called while holding the lock: unsetup() nils mImap under it and
+    // frees the stream right after releasing it, so a pointer grabbed and used outside the lock
+    // would be a use-after-free. Holding it here is safe - mailstream_cancel() only takes the
+    // cancel object's own mutex and writes one byte to a pipe, it never blocks.
+    LOCK();
+    if (mImap != NULL && mImap->imap_stream != NULL) {
+        mailstream_cancel(mImap->imap_stream);
+    }
+    UNLOCK();
+}
+
 IMAPIdentity * IMAPSession::identity(IMAPIdentity * clientIdentity, ErrorCode * pError)
 {
     connectIfNeeded(pError);
