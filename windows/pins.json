@@ -3,9 +3,17 @@
         "Everything besides the C/C++ sources that determines the content of the Windows",
         "prebuilt archive. This file is part of the source digest the archive is named after:",
         "changing anything here means the published binaries no longer match, and the build",
-        "asks for a new archive."
+        "asks for a new archive.",
+        "",
+        "Every value here is enforced, not documented: Publish-Mailcore2Prebuilt.ps1 refuses to",
+        "run when the toolchain does not match, and Build-Helpers.ps1 puts exactly these",
+        "versions on PATH."
     ],
     "dependenciesArchive": "mailcore2-windows-deps-1.zip",
+    "versions": {
+        "icu": "69.1",
+        "libxml2": "2.11.5"
+    },
     "dependencies": {
         "CTemplate": {
             "url": "https://github.com/readdle/ctemplate.git",
