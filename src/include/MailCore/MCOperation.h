@@ -20,6 +20,12 @@ namespace mailcore {
         virtual OperationCallback * callback();
         
         virtual void cancel();
+
+        /** Aborts whatever this operation is doing right now. Called by the queue, and only while
+         this operation is the one it is executing - so an implementation may assume it owns the
+         resource it is about to break. Does nothing by default. */
+        virtual void interrupt();
+
         virtual bool isCancelled();
         
         // Will be called on main thread.
