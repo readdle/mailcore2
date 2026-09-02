@@ -93,6 +93,32 @@ namespace mailcore {
         
         virtual void setMaximumConnections(unsigned int maxConnections);
         virtual unsigned int maximumConnections();
+
+        // How long an idle connection stays open once its queue drains, in seconds.
+        // Applied to connections created after the change.
+        virtual void setAutomaticDisconnectDelay(time_t delay);
+        virtual time_t automaticDisconnectDelay();
+
+        /*! Reserves a connection for exclusive use: the regular per-operation selection stops
+         seeing it, so only operations explicitly pointed at it (IMAPOperation::setSession) run
+         there, and the idle auto-disconnect stands down until release. Exclusivity is
+         forward-only: operations already queued on the connection still run ahead of the lease
+         holder's (selection prefers an idle or new connection, so a backlog is only possible
+         with the pool at its limit). Returns NULL when every connection is already reserved -
+         the pool has nothing left to hand out exclusively. While the pool is at its limit and
+         fully reserved, regular operations fall back to sharing the least busy reserved
+         connection, so size maximumConnections against the number of simultaneous leases.
+         Reservation state is as unsynchronized as the rest of the session selection: call
+         acquireConnection/releaseConnection on the session's dispatch queue (where operations
+         start), or serialize them with it externally. */
+        virtual IMAPAsyncConnection * acquireConnection(String * folder);
+        /*! Returns a reserved connection to the shared pool and re-arms its idle
+         auto-disconnect. With disconnect, tears the socket down first (the connection object
+         stays pooled and reconnects on next use) - for servers that pin a mailbox snapshot per
+         connection, and mandatory after interruptCurrentCommand, since a cancelled stream does
+         not recover. Idempotent: releasing a connection that is not reserved does nothing.
+         Same threading contract as acquireConnection. */
+        virtual void releaseConnection(IMAPAsyncConnection * connection, bool disconnect);
         
         virtual void setConnectionLogger(ConnectionLogger * logger);
         virtual ConnectionLogger * connectionLogger();
@@ -211,6 +237,7 @@ namespace mailcore {
         time_t mTimeout;
         bool mAllowsFolderConcurrentAccessEnabled;
         unsigned int mMaximumConnections;
+        time_t mAutomaticDisconnectDelay;
         ConnectionLogger * mConnectionLogger;
         bool mAutomaticConfigurationDone;
         IMAPIdentity * mServerIdentity;
@@ -231,8 +258,9 @@ namespace mailcore {
         /*! Returns a session with minimum operation queue among already created ones.
          If @param filterByFolder is true, then function filters sessions with
          predicate ( lastFolder() EQUALS TO @param folder ). In case of param folder is NULL
-         the function would search a session among non-selected ones. */
-        virtual IMAPAsyncConnection * sessionWithMinQueue(bool filterByFolder, String * folder);
+         the function would search a session among non-selected ones.
+         Reserved sessions are skipped unless @param includeReserved is true. */
+        virtual IMAPAsyncConnection * sessionWithMinQueue(bool filterByFolder, String * folder, bool includeReserved = false);
         /*! Returns existant or new session with empty operation queue, if it can.
          Otherwise, returns the session with the minimum size of the operation queue. */
         virtual IMAPAsyncConnection * availableSession();

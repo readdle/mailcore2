@@ -2,6 +2,7 @@
 #define MAILCORE_CIMAP_BASE_OPERATION_H
 
 #include "COperation.h"
+#include "CIMAPAsyncConnection.h"
 
 #ifdef __cplusplus
 class CIMAPBaseOperationIMAPCallback;
@@ -36,6 +37,7 @@ extern "C" {
     
     C_SYNTHESIZE_FUNC_DEFINITION(CIMAPBaseOperation, ErrorCode, error)
     C_SYNTHESIZE_FUNC_DEFINITION(CIMAPBaseOperation, bool, interruptCurrentCommand)
+    C_SYNTHESIZE_FUNC_DEFINITION(CIMAPBaseOperation, void, setSession, CIMAPAsyncConnection)
     C_SYNTHESIZE_FUNC_DEFINITION(CIMAPBaseOperation, CIMAPBaseOperation, setProgressBlocks, CIMAPProgressBlock, CIMAPProgressBlock, const void*)
     
     CMAILCORE_EXPORT void       CIMAPBaseOperation_retain(CIMAPBaseOperation operation)

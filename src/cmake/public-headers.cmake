@@ -88,6 +88,7 @@ set(MAILCORE2_ASYNC_HEADERS
 	async/MCAsync.h
 	async/imap/MCAsyncIMAP.h
 	async/imap/MCIMAPAppendMessageOperation.h
+	async/imap/MCIMAPAsyncConnection.h
 	async/imap/MCIMAPAsyncSession.h
 	async/imap/MCIMAPCapabilityOperation.h
 	async/imap/MCIMAPCheckAccountOperation.h

@@ -50,6 +50,7 @@ ErrorCode CIMAPBaseOperation_error(struct CIMAPBaseOperation self) {
 }
 
 C_SYNTHESIZE_FUNC_WITH_SCALAR(bool, interruptCurrentCommand)
+C_SYNTHESIZE_FUNC_WITH_VOID(setSession, CIMAPAsyncConnection)
 
 CIMAPBaseOperation CIMAPBaseOperation_setProgressBlocks(struct CIMAPBaseOperation self, CIMAPProgressBlock itemProgressBlock, CIMAPProgressBlock bodyProgressBlock, const void* userInfo) {
     CIMAPBaseOperationIMAPCallback *callback = new CIMAPBaseOperationIMAPCallback(userInfo, itemProgressBlock, bodyProgressBlock);
