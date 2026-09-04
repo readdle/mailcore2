@@ -25,6 +25,12 @@
 
 using namespace mailcore;
 
+#if !__APPLE__
+static void setMailStreamSSLContextServerName(mailstream_ssl_context * ssl_context, void * data) {
+    mailstream_ssl_set_server_name(ssl_context, static_cast<char*>(data));
+}
+#endif
+
 static int xover_resp_to_fields(struct newsnntp_xover_resp_item * item, struct mailimf_fields ** result);
 
 enum {
@@ -282,7 +288,18 @@ void NNTPSession::connect(ErrorCode * pError)
             
         case ConnectionTypeTLS:
             MCLog("connect %s %u", MCUTF8(hostname()), (unsigned int) port());
+#if __APPLE__
             r = newsnntp_ssl_connect(mNNTP, MCUTF8(hostname()), port());
+#else
+            // Passing callback to set the server name into SSL context
+            // Needed for SNI extension for TLS https://en.wikipedia.org/wiki/Server_Name_Indication
+            // On Apple platforms libetpan uses CFNetwork instead, that's why callback is not needed
+            r = newsnntp_ssl_connect_with_callback(mNNTP,
+                                                   MCUTF8(hostname()),
+                                                   port(),
+                                                   setMailStreamSSLContextServerName,
+                                                   const_cast<void*>(static_cast<const void*>(MCUTF8(hostname()))));
+#endif
             if (r != NEWSNNTP_NO_ERROR) {
                 * pError = ErrorConnection;
                 return;

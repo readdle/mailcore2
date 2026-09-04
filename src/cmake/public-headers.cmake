@@ -82,6 +82,7 @@ set(MAILCORE2_CORE_HEADERS
 	core/smtp/MCSMTP.h
 	core/smtp/MCSMTPProgressCallback.h
 	core/smtp/MCSMTPSession.h
+	core/security/MCCertificateUtils.h
 )
 
 set(MAILCORE2_ASYNC_HEADERS

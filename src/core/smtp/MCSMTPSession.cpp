@@ -330,7 +330,16 @@ void SMTPSession::connect(ErrorCode * pError)
             }
             
             MCLog("start TLS");
+#if __APPLE__
             r = mailsmtp_socket_starttls(mSmtp);
+#else
+            // Passing callback to set the server name into SSL context
+            // Needed for SNI extension for TLS https://en.wikipedia.org/wiki/Server_Name_Indication
+            // On Apple platforms libetpan uses CFNetwork instead, that's why callback is not needed
+            r = mailsmtp_socket_starttls_with_callback(mSmtp,
+                                                       setMailStreamSSLContextServerName,
+                                                       const_cast<void*>(static_cast<const void*>(MCUTF8(mHostname))));
+#endif
             saveLastResponse();
             if (r != MAILSMTP_NO_ERROR) {
                 * pError = ErrorStartTLSNotAvailable;
