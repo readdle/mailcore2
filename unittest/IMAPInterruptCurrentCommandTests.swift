@@ -5,11 +5,17 @@
 //  Tests for IMAPOperation::interruptCurrentCommand().
 //
 
-// Darwin only: the tests need a POSIX listening socket, and the Android job builds the test target
-// without running it. Nothing here is platform-specific beyond that socket.
-#if canImport(Darwin)
+// The tests need a POSIX listening socket, so they run wherever one is available: Apple platforms,
+// Android and Linux. Windows would need Winsock and is left out.
+#if canImport(Darwin) || canImport(Android) || canImport(Glibc)
 
+#if canImport(Darwin)
 import Darwin
+#elseif canImport(Android)
+import Android
+#elseif canImport(Glibc)
+import Glibc
+#endif
 import Dispatch
 import Foundation
 import XCTest
@@ -19,6 +25,11 @@ import CMailCore
 #endif
 
 @testable import MailCore
+
+/// The C `close()`, reachable by one name on every platform above.
+private func closeSocket(_ fileDescriptor: Int32) {
+    _ = close(fileDescriptor)
+}
 
 /// A TCP endpoint that accepts connections and then says nothing at all. A client connected to it
 /// sits in its first read until the socket timeout expires - exactly the state that
@@ -56,7 +67,7 @@ private final class SilentTCPEndpoint {
         }
 
         guard bound == 0, listen(fileDescriptor, 8) == 0 else {
-            close(fileDescriptor)
+            closeSocket(fileDescriptor)
             throw NSError(domain: "SilentTCPEndpoint", code: Int(errno), userInfo: nil)
         }
 
@@ -69,7 +80,7 @@ private final class SilentTCPEndpoint {
         }
 
         guard named == 0 else {
-            close(fileDescriptor)
+            closeSocket(fileDescriptor)
             throw NSError(domain: "SilentTCPEndpoint", code: Int(errno), userInfo: nil)
         }
 
@@ -93,7 +104,7 @@ private final class SilentTCPEndpoint {
             let closed = isClosed
             if closed {
                 lock.unlock()
-                Darwin.close(accepted)
+                closeSocket(accepted)
                 return
             }
             acceptedSockets.append(accepted)
@@ -112,9 +123,9 @@ private final class SilentTCPEndpoint {
         acceptedSockets = []
         lock.unlock()
 
-        Darwin.close(listeningSocket)
+        closeSocket(listeningSocket)
         for accepted in sockets {
-            Darwin.close(accepted)
+            closeSocket(accepted)
         }
     }
 }

@@ -22,10 +22,11 @@ import CMailCore
 ///                `10.1.2.3` and `2001:db8::1`; valid 2026-01-01 .. 2027-12-31
 ///  - `other.der` an unrelated root that signed nothing here
 ///
-/// The root is passed to the verifier as the only trust anchor, so the tests do not depend on
-/// the device's trust store, and verification is pinned to 2026-06-15 so they do not depend on
-/// the clock either. The leaf's validity stays under 825 days on purpose: Apple's TLS policy
-/// rejects longer-lived server certificates regardless of who issued them.
+/// The private root is handed to the verifier as an extra trust anchor. It is trusted in addition
+/// to the device's store, not instead of it, but nothing in that store issued these fixtures, so
+/// the outcome does not depend on the device. Verification is pinned to 2026-06-15 so it does not
+/// depend on the clock either. The leaf's validity stays under 825 days on purpose: Apple's TLS
+/// policy rejects longer-lived server certificates regardless of who issued them.
 final class CertificateUtilsTests: XCTestCase {
 
     /// 2026-06-15T00:00:00Z, inside the leaf's validity period.
