@@ -265,6 +265,8 @@ free_certs:
         }
         if (!sk_X509_push(certificates, certificate)) {
             MCLog("MCCertificateUtils error: can't sk_X509_push");
+            // Not on the stack, so sk_X509_pop_free() below will not release it.
+            X509_free(certificate);
             goto free_certs;
         }
     }
