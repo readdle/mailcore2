@@ -22,7 +22,7 @@ extern "C" {
     /// may be a DNS name or an IPv4/IPv6 literal.
     ///
     /// `derTrustAnchors` (CArray of CData): when its instance is non-NULL these roots are
-    /// trusted *instead of* the system store. `verifyTime`: Unix time to evaluate validity at,
+    /// trusted in addition to the system store. `verifyTime`: Unix time to evaluate validity at,
     /// 0 means now.
     CMAILCORE_EXPORT bool CCertificateUtils_checkCertificateChain(CArray derCertificates,
                                                                  MailCoreString hostname,

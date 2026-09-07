@@ -24,7 +24,7 @@ namespace mailcore {
     // leaf first) instead of a stream. `cTrustAnchors` (same layout) are trusted in
     // addition to the system store and `verifyTime` (Unix time, 0 = now) pins the
     // validity check; both exist for unit tests, production passes NULL and 0 (COR-170).
-    bool checkCertificateChain(carray * cCerts, String * hostname, carray * cTrustAnchors, time_t verifyTime);
+    MAILCORE_EXPORT bool checkCertificateChain(carray * cCerts, String * hostname, carray * cTrustAnchors, time_t verifyTime);
     
 }
 

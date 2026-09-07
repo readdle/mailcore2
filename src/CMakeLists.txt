@@ -114,6 +114,7 @@ if(WIN32)
   target_link_libraries(CMailCore 
                         PRIVATE 
                           ${MAILCORE2_LIB_TARGET}
+                          ${LIBETPAN_LIBRARY}
                           ${DISPATCH_LIBRARY}
                           ${DISPATCH_BLOCKS_LIBRARY}
   )
