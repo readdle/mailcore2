@@ -50,6 +50,7 @@ cp core/basetypes/MCDataStreamDecoder.h ./include/MailCore
 cp core/basetypes/MCDefines.h ./include/MailCore
 cp core/basetypes/MCMD5.h ./include/MailCore
 cp core/basetypes/MCOperationQueueCallback.h ./include/MailCore
+cp core/security/MCCertificateUtils.h ./include/MailCore
 cp core/basetypes/MCBase64.h ./include/MailCore
 cp core/basetypes/MCLock.h ./include/MailCore
 cp core/basetypes/MCMainThread.h ./include/MailCore
@@ -252,3 +253,4 @@ cp c/imap/CIMAPSearchOperation.h ./include/MailCore
 
 cp c/utils/COperation.h ./include/MailCore
 cp c/utils/CAutoreleasePool.h ./include/MailCore
+cp c/utils/CCertificateUtils.h ./include/MailCore

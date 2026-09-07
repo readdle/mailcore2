@@ -679,7 +679,16 @@ void IMAPSession::connect(ErrorCode * pError)
             goto close;
         }
 
+#if __APPLE__
         r = mailimap_socket_starttls(mImap);
+#else
+        // Passing callback to set the server name into SSL context
+        // Needed for SNI extension for TLS https://en.wikipedia.org/wiki/Server_Name_Indication
+        // On Apple platforms libetpan uses CFNetwork instead, that's why callback is not needed
+        r = mailimap_socket_starttls_with_callback(mImap,
+                                                   setMailStreamSSLContextServerName,
+                                                   const_cast<void*>(static_cast<const void*>(MCUTF8(mHostname))));
+#endif
         if (hasError(r)) {
             MCLog("no TLS %i", r);
             * pError = ErrorTLSNotAvailable;

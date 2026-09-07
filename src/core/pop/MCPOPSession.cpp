@@ -13,6 +13,12 @@
 
 using namespace mailcore;
 
+#if !__APPLE__
+static void setMailStreamSSLContextServerName(mailstream_ssl_context * ssl_context, void * data) {
+    mailstream_ssl_set_server_name(ssl_context, static_cast<char*>(data));
+}
+#endif
+
 enum {
     STATE_DISCONNECTED,
     STATE_CONNECTED,
@@ -223,7 +229,16 @@ void POPSession::connect(ErrorCode * pError)
         }
 
         MCLog("start TLS");
+#if __APPLE__
         r = mailpop3_socket_starttls(mPop);
+#else
+        // Passing callback to set the server name into SSL context
+        // Needed for SNI extension for TLS https://en.wikipedia.org/wiki/Server_Name_Indication
+        // On Apple platforms libetpan uses CFNetwork instead, that's why callback is not needed
+        r = mailpop3_socket_starttls_with_callback(mPop,
+                                                   setMailStreamSSLContextServerName,
+                                                   const_cast<void*>(static_cast<const void*>(MCUTF8(hostname()))));
+#endif
         if (r != MAILPOP3_NO_ERROR) {
             * pError = ErrorStartTLSNotAvailable;
             return;
@@ -237,7 +252,18 @@ void POPSession::connect(ErrorCode * pError)
 
         case ConnectionTypeTLS:
         MCLog("connect %s %u", MCUTF8(hostname()), (unsigned int) port());
+#if __APPLE__
         r = mailpop3_ssl_connect(mPop, MCUTF8(hostname()), port());
+#else
+        // Passing callback to set the server name into SSL context
+        // Needed for SNI extension for TLS https://en.wikipedia.org/wiki/Server_Name_Indication
+        // On Apple platforms libetpan uses CFNetwork instead, that's why callback is not needed
+        r = mailpop3_ssl_connect_with_callback(mPop,
+                                               MCUTF8(hostname()),
+                                               port(),
+                                               setMailStreamSSLContextServerName,
+                                               const_cast<void*>(static_cast<const void*>(MCUTF8(hostname()))));
+#endif
         if (r != MAILPOP3_NO_ERROR) {
             * pError = ErrorConnection;
             return;
