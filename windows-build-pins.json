@@ -1,0 +1,28 @@
+{
+    "comment": [
+        "Everything besides the C/C++ sources that determines the content of the Windows",
+        "prebuilt archive. This file is part of the source digest the archive is named after:",
+        "changing anything here means the published binaries no longer match, and the build",
+        "asks for a new archive."
+    ],
+    "dependenciesArchive": "mailcore2-windows-deps-1.zip",
+    "dependencies": {
+        "CTemplate": {
+            "url": "https://github.com/readdle/ctemplate.git",
+            "revision": "a56e2d43eb57dc1e132a96f0fd9e4df198d1c35b"
+        },
+        "LibEtPan": {
+            "url": "https://github.com/readdle/libetpan.git",
+            "revision": "205e238f31f86c4a1f45fda2ff8a9bf7ebbb25a5"
+        },
+        "TidyHTML5": {
+            "url": "https://github.com/readdle/tidy-html5.git",
+            "revision": "fa323fa658e17ea66a406195e0dd423a4266d82e"
+        }
+    },
+    "toolchain": {
+        "swift": "5.10.1",
+        "msvcToolset": "14.39.33519",
+        "windowsSdk": "10.0.26100.0"
+    }
+}

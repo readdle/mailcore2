@@ -22,6 +22,7 @@
 #include "CIMAPFolderInfoOperation.h"
 #include "CIMAPFolderStatusOperation.h"
 #include "CMessageConstants.h"
+#include "CIMAPAsyncConnection.h"
 #include "CIMAPIdleOperation.h"
 #include "CIMAPFetchFoldersOperation.h"
 #include "CIMAPCapabilityOperation.h"
@@ -70,6 +71,7 @@ extern "C" {
     C_SYNTHESIZE_PROPERTY_DEFINITION(CIMAPAsyncSession, MailCoreString, OAuth2Token, setOAuth2Token)
     C_SYNTHESIZE_PROPERTY_DEFINITION(CIMAPAsyncSession, CAuthType, authType, setAuthType)
     C_SYNTHESIZE_PROPERTY_DEFINITION(CIMAPAsyncSession, unsigned int, maximumConnections, setMaximumConnections)
+    C_SYNTHESIZE_PROPERTY_DEFINITION(CIMAPAsyncSession, time_t, automaticDisconnectDelay, setAutomaticDisconnectDelay)
     C_SYNTHESIZE_PROPERTY_DEFINITION(CIMAPAsyncSession, bool, allowsFolderConcurrentAccessEnabled, setAllowsFolderConcurrentAccessEnabled)
     C_SYNTHESIZE_PROPERTY_DEFINITION(CIMAPAsyncSession, CIMAPNamespace, defaultNamespace, setDefaultNamespace)
     C_SYNTHESIZE_PROPERTY_DEFINITION(CIMAPAsyncSession, CIMAPIdentity, clientIdentity, setClientIdentity)
@@ -85,6 +87,8 @@ extern "C" {
     C_SYNTHESIZE_READONLY_PROPERTY_DEFINITION(CIMAPAsyncSession, bool, isOperationQueueRunning)
     
     C_SYNTHESIZE_FUNC_DEFINITION(CIMAPAsyncSession, void, cancelAllOperations)
+    C_SYNTHESIZE_FUNC_DEFINITION(CIMAPAsyncSession, CIMAPAsyncConnection, acquireConnection, MailCoreString)
+    C_SYNTHESIZE_FUNC_DEFINITION(CIMAPAsyncSession, void, releaseConnection, CIMAPAsyncConnection, bool)
     C_SYNTHESIZE_FUNC_DEFINITION(CIMAPAsyncSession, CIMAPBaseOperation, connectOperation)
     C_SYNTHESIZE_FUNC_DEFINITION(CIMAPAsyncSession, CIMAPBaseOperation, disconnectOperation)
     C_SYNTHESIZE_FUNC_DEFINITION(CIMAPAsyncSession, CIMAPBaseOperation, noopOperation)

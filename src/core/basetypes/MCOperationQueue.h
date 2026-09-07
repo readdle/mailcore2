@@ -23,14 +23,11 @@ namespace mailcore {
         virtual void cancelAllOperations();
 
         /** Calls interrupt() on `op` if it is the operation whose main() the queue is executing
-         right now. The check and the call happen under the queue's lock, so no other operation can
-         become the running one in between: the interrupt cannot land on whatever started next.
-         It does not stop `op` itself from finishing - main() runs without the lock - so an
-         operation that completes just as the caller reaches it gets a harmless interrupt on an
-         idle stream. Lets a caller abort "the command my operation is running" without the risk
-         of aborting somebody else's. Returns whether interrupt() was called - a caller that
-         measures the effect needs to tell "there was a command to break" from "there was
-         nothing". */
+         right now. The check and the call happen under the queue's lock, so the operation cannot
+         finish - and another one cannot take over the resource - in between.
+         Lets a caller abort "the command my operation is running" without the risk of aborting
+         whatever started after it. Returns whether interrupt() was called - a caller that measures
+         the effect needs to tell "there was a command to break" from "there was nothing". */
         virtual bool interruptRunningOperation(Operation * op);
         
         virtual unsigned int count();

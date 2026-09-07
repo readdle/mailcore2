@@ -55,6 +55,7 @@ IMAPAsyncSession::IMAPAsyncSession()
     mSessions = new Array();
     mMaximumConnections = DEFAULT_MAX_CONNECTIONS;
     mAllowsFolderConcurrentAccessEnabled = true;
+    mAutomaticDisconnectDelay = 30;
 
     mHostname = NULL;
     mPort = 0;
@@ -239,6 +240,16 @@ unsigned int IMAPAsyncSession::maximumConnections()
     return mMaximumConnections;
 }
 
+void IMAPAsyncSession::setAutomaticDisconnectDelay(time_t delay)
+{
+    mAutomaticDisconnectDelay = delay;
+}
+
+time_t IMAPAsyncSession::automaticDisconnectDelay()
+{
+    return mAutomaticDisconnectDelay;
+}
+
 IMAPIdentity * IMAPAsyncSession::serverIdentity()
 {
     return mServerIdentity;
@@ -279,6 +290,7 @@ IMAPAsyncConnection * IMAPAsyncSession::session()
     session->setAuthType(mAuthType);
     session->setConnectionType(mConnectionType);
     session->setTimeout(mTimeout);
+    session->setAutomaticDisconnectDelay(mAutomaticDisconnectDelay);
     session->setCheckCertificateEnabled(mCheckCertificateEnabled);
     session->setVoIPEnabled(mVoIPEnabled);
     session->setDefaultNamespace(mDefaultNamespace);
@@ -315,15 +327,22 @@ IMAPAsyncConnection * IMAPAsyncSession::sessionForFolder(String * folder, bool u
             // in urgent mode try reuse any available session with
             // empty queue or create new one, if maximum connections limit does not reached.
             s = availableSession();
-            if (s->operationsCount() == 0) {
-                s->setLastFolder(folder);
+            if (s != NULL && s->operationsCount() == 0) {
+                if (!s->isReserved()) {
+                    s->setLastFolder(folder);
+                }
                 return s;
             }
         }
 
         // otherwise returns session with minimum size of queue among selected to the folder.
+        // A reserved result (the all-reserved fallback) keeps its affinity hint: it belongs to
+        // the lease holder, and an acquireConnection call that lands here runs no operation at
+        // all - stamping the hint would desync it from the actually selected mailbox.
         s = matchingSessionForFolder(folder);
-        s->setLastFolder(folder);
+        if (s != NULL && !s->isReserved()) {
+            s->setLastFolder(folder);
+        }
         return s;
     }
 }
@@ -341,6 +360,13 @@ IMAPAsyncConnection * IMAPAsyncSession::availableSession()
         chosenSession = session();
         mSessions->addObject(chosenSession);
         return chosenSession;
+    }
+
+    if (chosenSession == NULL) {
+        // every connection is reserved and the pool is at its limit: share the least busy
+        // reserved one. The lease it belongs to loses exclusivity, but callers dereference
+        // the result, so NULL here would be a crash rather than backpressure.
+        chosenSession = sessionWithMinQueue(false, NULL, true);
     }
 
     // otherwise returns existant session with minimum size of queue.
@@ -376,7 +402,7 @@ IMAPAsyncConnection * IMAPAsyncSession::matchingSessionForFolder(String * folder
     return availableSession();
 }
 
-IMAPAsyncConnection * IMAPAsyncSession::sessionWithMinQueue(bool filterByFolder, String * folder)
+IMAPAsyncConnection * IMAPAsyncSession::sessionWithMinQueue(bool filterByFolder, String * folder, bool includeReserved)
 {
     IMAPAsyncConnection * chosenSession = NULL;
     unsigned int minOperationsCount = 0;
@@ -384,8 +410,9 @@ IMAPAsyncConnection * IMAPAsyncSession::sessionWithMinQueue(bool filterByFolder,
     for (unsigned int i = 0 ; i < mSessions->count() ; i ++) {
         IMAPAsyncConnection * s = (IMAPAsyncConnection *) mSessions->objectAtIndex(i);
         if ((chosenSession == NULL) || (s->operationsCount() < minOperationsCount)) {
-            bool matched = true;
-            if (filterByFolder) {
+            // a reserved session serves its lease holder exclusively
+            bool matched = includeReserved || !s->isReserved();
+            if (matched && filterByFolder) {
                 // filter by last selested folder
                 matched = ((folder != NULL && s->lastFolder() != NULL && s->lastFolder()->isEqual(folder))
                            || (folder == NULL && s->lastFolder() == NULL));
@@ -398,6 +425,43 @@ IMAPAsyncConnection * IMAPAsyncSession::sessionWithMinQueue(bool filterByFolder,
     }
 
     return chosenSession;
+}
+
+IMAPAsyncConnection * IMAPAsyncSession::acquireConnection(String * folder)
+{
+    // A lease wants the shortest possible foreign backlog ahead of it, so an idle or new
+    // connection is preferred over the busiest matching one: urgent mode when folder affinity
+    // is worth trying first, the plain available-session pick when there is no folder to match
+    // (sessionForFolder ignores urgent for a NULL folder).
+    IMAPAsyncConnection * connection = (folder != NULL) ? sessionForFolder(folder, true) : availableSession();
+    if (connection == NULL || connection->isReserved()) {
+        // sessionForFolder only hands out a reserved connection when the whole pool is
+        // reserved. Reserving it again would give one connection two lease holders.
+        return NULL;
+    }
+    connection->setReserved(true);
+    return connection;
+}
+
+void IMAPAsyncSession::releaseConnection(IMAPAsyncConnection * connection, bool disconnect)
+{
+    if (connection == NULL || !connection->isReserved() || connection->owner() != this) {
+        // Idempotent by contract: a second release would enqueue its disconnect on a
+        // connection that is back in the shared pool and may be serving other operations.
+        return;
+    }
+    if (disconnect) {
+        // queued while still reserved, so no newcomer lands ahead of the disconnect
+        connection->disconnectOperation()->start();
+        connection->setReserved(false);
+    }
+    else {
+        connection->setReserved(false);
+        // The idle timer died if it fired during the lease; arm it anew so a pooled connection
+        // nobody picks up still goes away. On the disconnect path the drain after the
+        // disconnect operation re-arms it the regular way.
+        connection->tryAutomaticDisconnect();
+    }
 }
 
 IMAPFolderInfoOperation * IMAPAsyncSession::folderInfoOperation(String * folder)

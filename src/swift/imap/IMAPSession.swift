@@ -143,7 +143,61 @@ public class MCOIMAPSession: NSObjectCompat {
         get { return session.maximumConnections }
         set { session.maximumConnections = newValue }
     }
-    
+
+    /**
+     How long an idle connection stays open once its operation queue drains, in seconds.
+     Defaults to 30. Applies to connections created after the change.
+     */
+    public var automaticDisconnectDelay: TimeInterval {
+        get { return Double(session.automaticDisconnectDelay) }
+        set { session.automaticDisconnectDelay = time_t(newValue) }
+    }
+
+    /**
+     Reserves one connection of the pool for exclusive use: the regular per-operation selection
+     stops seeing it, so new commands run on it only when explicitly pointed at it with
+     MCOIMAPBaseOperation.setConnection(_:), and the idle auto-disconnect stands down until
+     release. Exclusivity is forward-only: operations already queued on the connection still
+     run ahead of the lease holder's (selection prefers an idle or new connection, so a backlog
+     is only possible with the pool at its limit).
+
+     Returns nil when every connection is already reserved - callers must then fall back to the
+     shared pool. The reverse degradation exists too: while the pool is at its limit and fully
+     reserved, regular operations share the least busy reserved connection, so size
+     maximumConnections against the number of simultaneous leases. Every acquired connection
+     must be handed back with releaseConnection(_:disconnect:): a leaked lease permanently
+     degrades the pool — the connection is never handed out exclusively again and, at the
+     limit, falls back to being shared.
+
+     Reservation state is as unsynchronized as the rest of the session's connection selection:
+     call acquireConnection/releaseConnection on the session's dispatchQueue (where operations
+     start), or serialize them with it externally.
+     */
+    public func acquireConnection(folder: String?) -> MCOIMAPAsyncConnection? {
+        return mailCoreAutoreleasePool {
+            let connection = session.acquireConnection(folder?.mailCoreString() ?? MailCoreString())
+            guard connection.instance != nil else {
+                return nil
+            }
+            return MCOIMAPAsyncConnection(connection: connection)
+        }
+    }
+
+    /**
+     Returns an acquired connection to the shared pool and re-arms its idle auto-disconnect.
+
+     With disconnect, the socket is torn down first (the connection object stays pooled and
+     reconnects on next use) - for servers that pin a mailbox snapshot per connection, and
+     mandatory after interruptCurrentCommand(), since a cancelled stream does not recover.
+     Idempotent: releasing a connection that is not reserved does nothing. Same threading
+     contract as acquireConnection(folder:).
+     */
+    public func releaseConnection(_ connection: MCOIMAPAsyncConnection, disconnect: Bool) {
+        mailCoreAutoreleasePool {
+            session.releaseConnection(connection.connection, disconnect)
+        }
+    }
+
     /**
      Sets logger callback. The network traffic will be sent to this block.
      
