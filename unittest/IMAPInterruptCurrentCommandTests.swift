@@ -132,6 +132,18 @@ private final class SilentTCPEndpoint {
 
 final class IMAPInterruptCurrentCommandTests: XCTestCase {
 
+    #if os(Android)
+    /// MailCore's Android build has no process-wide main queue: the app installs one through
+    /// MCOOperation.setMainQueue() and Object::getMainQueue() aborts when nobody did. In this
+    /// process the test is the app. Kept in a static so the queue outlives every operation.
+    private static let mailCoreMainQueue = DispatchQueue(label: "IMAPInterruptCurrentCommandTests.mailcore-main")
+
+    override class func setUp() {
+        super.setUp()
+        MCOOperation.setMainQueue(mailCoreMainQueue)
+    }
+    #endif
+
     /// Well above every wait below: a command left to its own devices must not be able to finish on
     /// its own and pass a test that is about being interrupted.
     private let sessionTimeout: TimeInterval = 60
