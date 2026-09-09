@@ -122,6 +122,10 @@ namespace mailcore {
         
         virtual void cancelAllOperations();
         virtual bool interruptCurrentCommand(IMAPOperation * operation);
+
+        // Wall-clock moment of this connection's last successful LOGIN (see
+        // IMAPSession::lastLoginTime), 0 when it has never logged in.
+        virtual double lastLoginTime();
         virtual unsigned int operationsCount();
 
         // A reserved connection belongs to one lease holder: the session selection skips it,

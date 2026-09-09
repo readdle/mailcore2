@@ -283,6 +283,11 @@ IMAPSession * IMAPAsyncConnection::session()
     return mSession;
 }
 
+double IMAPAsyncConnection::lastLoginTime()
+{
+    return mSession->lastLoginTime();
+}
+
 unsigned int IMAPAsyncConnection::operationsCount()
 {
     return mQueue->count();

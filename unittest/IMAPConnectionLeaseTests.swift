@@ -105,7 +105,7 @@ final class IMAPConnectionLeaseTests: XCTestCase {
     }
 
     func testPinnedOperationRunsOnTheLeasedConnection() throws {
-        let endpoint = try SilentTCPEndpoint()
+        let endpoint = try LeaseTestTCPEndpoint()
         defer { endpoint.stop() }
 
         let session = makeSession(port: endpoint.port, maximumConnections: 2)
@@ -137,7 +137,7 @@ final class IMAPConnectionLeaseTests: XCTestCase {
     }
 
     func testUnpinnedOperationAvoidsTheLeasedConnection() throws {
-        let endpoint = try SilentTCPEndpoint()
+        let endpoint = try LeaseTestTCPEndpoint()
         defer { endpoint.stop() }
 
         let session = makeSession(port: endpoint.port, maximumConnections: 2)
@@ -167,7 +167,7 @@ final class IMAPConnectionLeaseTests: XCTestCase {
     /// shares the least busy reserved connection with regular operations instead of crashing on
     /// a NULL session.
     func testExhaustedPoolSharesTheLeasedConnection() throws {
-        let endpoint = try SilentTCPEndpoint()
+        let endpoint = try LeaseTestTCPEndpoint()
         defer { endpoint.stop() }
 
         let session = makeSession(port: endpoint.port, maximumConnections: 1)
@@ -194,7 +194,7 @@ final class IMAPConnectionLeaseTests: XCTestCase {
     }
 
     func testAcquirePrefersAnIdleConnectionOverABusyOne() throws {
-        let endpoint = try SilentTCPEndpoint()
+        let endpoint = try LeaseTestTCPEndpoint()
         defer { endpoint.stop() }
 
         let session = makeSession(port: endpoint.port, maximumConnections: 2)
@@ -227,7 +227,7 @@ final class IMAPConnectionLeaseTests: XCTestCase {
     /// Also exercises the session -> connection plumbing of automaticDisconnectDelay: with the
     /// default 30s the timer could not fire inside the observation windows at all.
     func testAutomaticDisconnectStandsDownWhileReservedAndReleaseRearmsIt() throws {
-        let endpoint = try SilentTCPEndpoint(greeting: "* OK [CAPABILITY IMAP4rev1] SilentTCPEndpoint ready\r\n")
+        let endpoint = try LeaseTestTCPEndpoint(greeting: "* OK [CAPABILITY IMAP4rev1] LeaseTestTCPEndpoint ready\r\n")
         defer { endpoint.stop() }
 
         let session = makeSession(port: endpoint.port, maximumConnections: 1)
@@ -258,7 +258,7 @@ final class IMAPConnectionLeaseTests: XCTestCase {
     }
 
     func testReleaseWithDisconnectClosesTheConnection() throws {
-        let endpoint = try SilentTCPEndpoint(greeting: "* OK [CAPABILITY IMAP4rev1] SilentTCPEndpoint ready\r\n")
+        let endpoint = try LeaseTestTCPEndpoint(greeting: "* OK [CAPABILITY IMAP4rev1] LeaseTestTCPEndpoint ready\r\n")
         defer { endpoint.stop() }
 
         let session = makeSession(port: endpoint.port, maximumConnections: 1)
@@ -282,7 +282,7 @@ final class IMAPConnectionLeaseTests: XCTestCase {
     }
 
     func testReleaseIsIdempotent() throws {
-        let endpoint = try SilentTCPEndpoint(greeting: "* OK [CAPABILITY IMAP4rev1] SilentTCPEndpoint ready\r\n")
+        let endpoint = try LeaseTestTCPEndpoint(greeting: "* OK [CAPABILITY IMAP4rev1] LeaseTestTCPEndpoint ready\r\n")
         defer { endpoint.stop() }
 
         let session = makeSession(port: endpoint.port, maximumConnections: 1)
@@ -308,8 +308,34 @@ final class IMAPConnectionLeaseTests: XCTestCase {
         }
     }
 
+    /// The freshness question a leaseholder actually asks is "was this connection's view taken
+    /// before my signal", and a connection that has never logged in has no view at all: its
+    /// first command logs in and therefore sees the current state. Reporting nil here is what
+    /// lets a caller skip a teardown it used to pay for, having no way to tell a fresh pool
+    /// connection from a stale one.
+    ///
+    /// acquireConnection does no I/O, so this asserts on a connection that provably never
+    /// reached the wire. The other half - that a real LOGIN is recorded and a later one moves
+    /// the value forward - is not unit-testable here: this suite has no IMAP server, and a fake
+    /// answering just enough to get through LOGIN would encode mailcore's own post-login
+    /// sequence in a test. It is verified against the live server instead.
+    func testNeverConnectedConnectionReportsNoLoginTime() throws {
+        let endpoint = try LeaseTestTCPEndpoint()
+        defer { endpoint.stop() }
+
+        let session = makeSession(port: endpoint.port, maximumConnections: 1)
+
+        guard let leased = session.acquireConnection(folder: nil) else {
+            return XCTFail("An empty pool with room for 1 connection must satisfy the lease")
+        }
+        defer { session.releaseConnection(leased, disconnect: false) }
+
+        XCTAssertNil(leased.lastLoginDate,
+                     "A pool connection that has never logged in must not claim a login moment")
+    }
+
     func testConnectionScopedDisconnectTearsTheSocketButKeepsTheLease() throws {
-        let endpoint = try SilentTCPEndpoint(greeting: "* OK [CAPABILITY IMAP4rev1] SilentTCPEndpoint ready\r\n")
+        let endpoint = try LeaseTestTCPEndpoint(greeting: "* OK [CAPABILITY IMAP4rev1] LeaseTestTCPEndpoint ready\r\n")
         defer { endpoint.stop() }
 
         let session = makeSession(port: endpoint.port, maximumConnections: 1)

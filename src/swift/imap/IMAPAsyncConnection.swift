@@ -46,6 +46,27 @@ public class MCOIMAPAsyncConnection: NSObjectCompat {
     }
 
     /**
+     Wall-clock moment of this connection's last successful LOGIN, nil when it has never logged
+     in. On a server that pins the mailbox view per connection, this answers the only question
+     that matters at the start of a lease: whether the view this connection holds was taken
+     before or after some event of the caller's own. Logins the pool performs on its own - after
+     its automatic disconnect, a dropped socket, an error retry - move it, so a caller stays
+     correct without observing them.
+
+     A disconnect does not move it: between the disconnect and the next login the value still
+     reports the previous login, which reads as older than it is and so errs towards a caller
+     refreshing a connection that needed no refresh, never the other way.
+
+     Wall clock, so a comparison against a moment the caller recorded the same way is only as
+     reliable as the clock: a step backwards between the login and the caller's own event can
+     make the login look later than it was.
+     */
+    public var lastLoginDate: Date? {
+        let value = connection.lastLoginTime
+        return value > 0 ? Date(timeIntervalSince1970: value) : nil
+    }
+
+    /**
      Returns an operation that disconnects this connection only: the object stays pooled (and
      leased, if it is), and the next command on it logs in from scratch. With a lease on a
      server that pins the mailbox view per connection, this is how the holder forces a view no

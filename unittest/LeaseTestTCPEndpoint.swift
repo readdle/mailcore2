@@ -1,5 +1,5 @@
 //
-//  SilentTCPEndpoint.swift
+//  LeaseTestTCPEndpoint.swift
 //  mailcore2
 //
 //  Shared test helper.
@@ -21,11 +21,11 @@ import Foundation
 /// capabilities in the banner so the client does not follow up with a CAPABILITY command) and the
 /// connection then idles, which makes disconnect behavior observable: mailcore tears a connection
 /// down by closing the socket, reported here through waitForClientDisconnect().
-final class SilentTCPEndpoint {
+final class LeaseTestTCPEndpoint {
 
     private let listeningSocket: Int32
     private let greeting: String?
-    private let acceptQueue = DispatchQueue(label: "SilentTCPEndpoint.accept")
+    private let acceptQueue = DispatchQueue(label: "LeaseTestTCPEndpoint.accept")
     private let lock = NSLock()
     private var acceptedSockets: [Int32] = []
     private var openClientCount = 0
@@ -43,7 +43,7 @@ final class SilentTCPEndpoint {
         // would capture self before `port` is initialized.
         let fileDescriptor = socket(AF_INET, SOCK_STREAM, 0)
         guard fileDescriptor >= 0 else {
-            throw NSError(domain: "SilentTCPEndpoint", code: Int(errno), userInfo: nil)
+            throw NSError(domain: "LeaseTestTCPEndpoint", code: Int(errno), userInfo: nil)
         }
 
         var reuse: Int32 = 1
@@ -62,7 +62,7 @@ final class SilentTCPEndpoint {
 
         guard bound == 0, listen(fileDescriptor, 8) == 0 else {
             close(fileDescriptor)
-            throw NSError(domain: "SilentTCPEndpoint", code: Int(errno), userInfo: nil)
+            throw NSError(domain: "LeaseTestTCPEndpoint", code: Int(errno), userInfo: nil)
         }
 
         var boundAddress = sockaddr_in()
@@ -75,7 +75,7 @@ final class SilentTCPEndpoint {
 
         guard named == 0 else {
             close(fileDescriptor)
-            throw NSError(domain: "SilentTCPEndpoint", code: Int(errno), userInfo: nil)
+            throw NSError(domain: "LeaseTestTCPEndpoint", code: Int(errno), userInfo: nil)
         }
 
         listeningSocket = fileDescriptor

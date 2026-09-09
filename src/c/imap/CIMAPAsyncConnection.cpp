@@ -13,4 +13,5 @@ C_SYNTHESIZE_CONSTRUCTOR()
 
 C_SYNTHESIZE_FUNC_WITH_SCALAR(bool, isReserved)
 C_SYNTHESIZE_FUNC_WITH_SCALAR(unsigned int, operationsCount)
+C_SYNTHESIZE_FUNC_WITH_SCALAR(double, lastLoginTime)
 C_SYNTHESIZE_FUNC_WITH_OBJ(CIMAPBaseOperation, disconnectOperation)
