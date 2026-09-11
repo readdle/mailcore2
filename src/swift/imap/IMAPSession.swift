@@ -145,15 +145,6 @@ public class MCOIMAPSession: NSObjectCompat {
     }
 
     /**
-     How long an idle connection stays open once its operation queue drains, in seconds.
-     Defaults to 30. Applies to connections created after the change.
-     */
-    public var automaticDisconnectDelay: TimeInterval {
-        get { return Double(session.automaticDisconnectDelay) }
-        set { session.automaticDisconnectDelay = time_t(newValue) }
-    }
-
-    /**
      Reserves one connection of the pool for exclusive use: the regular per-operation selection
      stops seeing it, so new commands run on it only when explicitly pointed at it with
      MCOIMAPBaseOperation.setConnection(_:), and the idle auto-disconnect stands down until
@@ -197,8 +188,7 @@ public class MCOIMAPSession: NSObjectCompat {
      Returns an acquired connection to the shared pool and re-arms its idle auto-disconnect.
 
      With disconnect, the socket is torn down first (the connection object stays pooled and
-     reconnects on next use) - for servers that pin a mailbox snapshot per connection, and
-     mandatory after interruptCurrentCommand(), since a cancelled stream does not recover.
+     reconnects on next use) - for servers that pin a mailbox snapshot per connection.
      Idempotent: releasing a connection that is not reserved does nothing. Same threading
      contract as acquireConnection(folder:).
      */

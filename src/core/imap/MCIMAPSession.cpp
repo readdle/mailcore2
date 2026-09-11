@@ -3740,6 +3740,11 @@ void IMAPSession::interruptCurrentCommand()
     LOCK();
     if (mImap != NULL && mImap->imap_stream != NULL) {
         mailstream_cancel(mImap->imap_stream);
+        // libetpan never clears a stream's cancelled state: every read and write on it fails from
+        // here on. The next command must reconnect, and connectIfNeeded does that for this flag,
+        // so the connection stays pooled and heals on its own instead of relying on the caller
+        // to tear it down.
+        mShouldDisconnect = true;
     }
     UNLOCK();
 }

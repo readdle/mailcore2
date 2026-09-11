@@ -25,6 +25,7 @@ final class LeaseTestTCPEndpoint {
 
     private let listeningSocket: Int32
     private let greeting: String?
+    private let answers: [String: String]
     private let acceptQueue = DispatchQueue(label: "LeaseTestTCPEndpoint.accept")
     private let lock = NSLock()
     private var acceptedSockets: [Int32] = []
@@ -35,9 +36,12 @@ final class LeaseTestTCPEndpoint {
     let port: UInt16
 
     /// Pass an IMAP banner (e.g. "* OK [CAPABILITY IMAP4rev1] ready\r\n") to let connects finish;
-    /// pass nil to stay silent so that every command blocks.
-    init(greeting: String? = nil) throws {
+    /// pass nil to stay silent so that every command blocks. `answers` maps a command name
+    /// (LOGIN, LIST, ...) to the untagged lines to send before its tagged OK, so a test can walk
+    /// the client to a chosen state; any command not listed still blocks.
+    init(greeting: String? = nil, answers: [String: String] = [:]) throws {
         self.greeting = greeting
+        self.answers = answers
 
         // Everything below works on a local descriptor: a closure that touched `listeningSocket`
         // would capture self before `port` is initialized.
@@ -120,14 +124,35 @@ final class LeaseTestTCPEndpoint {
                 }
             }
 
-            // Incoming commands are read and discarded - never answered - so EOF, i.e. the client
-            // closing its socket, is the only thing this loop reports. The reader owns the
-            // descriptor: closing it from stop() while recv() blocks on it would let the fd
-            // number be reused and the loop read somebody else's descriptor; stop() only
-            // shuts the socket down, which wakes recv(), and the close happens here.
+            // Incoming commands are read and discarded - never answered, except the ones listed in
+            // `answers` - so EOF, i.e. the client closing its socket, is the only other thing this
+            // loop reports. The reader owns the descriptor: closing it from stop() while recv() blocks
+            // on it would let the fd number be reused and the loop read somebody else's
+            // descriptor; stop() only shuts the socket down, which wakes recv(), and the close
+            // happens here.
+            let answers = self.answers
             DispatchQueue.global().async { [weak self] in
                 var buffer = [UInt8](repeating: 0, count: 1024)
-                while recv(accepted, &buffer, buffer.count, 0) > 0 {
+                var pending = ""
+                while true {
+                    let received = recv(accepted, &buffer, buffer.count, 0)
+                    guard received > 0 else {
+                        break
+                    }
+                    guard answers.isEmpty == false else {
+                        continue
+                    }
+                    pending += String(decoding: buffer[0..<Int(received)], as: UTF8.self)
+                    while let lineEnd = pending.range(of: "\r\n") {
+                        let line = String(pending[..<lineEnd.lowerBound])
+                        pending.removeSubrange(..<lineEnd.upperBound)
+                        let words = line.split(separator: " ")
+                        guard words.count >= 2, let untagged = answers[words[1].uppercased()] else {
+                            continue
+                        }
+                        let reply = Array((untagged + "\(words[0]) OK \(words[1]) completed\r\n").utf8)
+                        _ = reply.withUnsafeBufferPointer { send(accepted, $0.baseAddress!, $0.count, 0) }
+                    }
                 }
                 Darwin.close(accepted)
                 guard let self = self else {
@@ -138,6 +163,13 @@ final class LeaseTestTCPEndpoint {
                 self.lock.unlock()
             }
         }
+    }
+
+    /// How many clients connected so far, closed ones included.
+    var acceptedClientCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return acceptedSockets.count
     }
 
     /// Waits until at least one client was accepted and every accepted client has closed its

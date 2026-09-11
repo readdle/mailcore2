@@ -129,10 +129,54 @@ final class IMAPConnectionLeaseTests: XCTestCase {
             XCTAssertEqual(finished.wait(timeout: .now() + 10), .success,
                            "interruptCurrentCommand() did not unblock the pinned command")
 
-            // After an interrupt the stream does not recover, so the lease comes back
-            // with a disconnect.
-            session.releaseConnection(leased, disconnect: true)
+            session.releaseConnection(leased, disconnect: false)
             XCTAssertFalse(leased.isReserved)
+        }
+    }
+
+    func testInterruptedConnectionReconnectsOnItsNextCommand() throws {
+        // LOGIN and what mailcore sends right after it (CAPABILITY, the delimiter LIST) are
+        // answered, so that the command the interrupt cuts is the NOOP itself: a stream error
+        // inside any of those already schedules a reconnect on its own, one inside NOOP does not.
+        let endpoint = try LeaseTestTCPEndpoint(greeting: "* OK [CAPABILITY IMAP4rev1] LeaseTestTCPEndpoint ready\r\n",
+                                                answers: ["LOGIN": "",
+                                                          "CAPABILITY": "* CAPABILITY IMAP4rev1\r\n",
+                                                          "LIST": "* LIST (\\Noselect) \"/\" \"\"\r\n"])
+        defer { endpoint.stop() }
+
+        let session = makeSession(port: endpoint.port, maximumConnections: 1)
+
+        guard let leased = session.acquireConnection(folder: nil) else {
+            return XCTFail("An empty pool with room for 1 connection must satisfy the lease")
+        }
+
+        runOffMainThread(timeout: 30) {
+            let connect = session.connectOperation()
+            connect.setConnection(leased)
+            XCTAssertEqual(self.start(connect).wait(timeout: .now() + 5), .success,
+                           "The greeting endpoint was expected to let the connect finish")
+            XCTAssertEqual(endpoint.acceptedClientCount, 1)
+
+            // Nothing answers the NOOP, so it blocks until interrupted.
+            let noop = session.noopOperation()
+            noop.setConnection(leased)
+            let finished = self.start(noop)
+            XCTAssertTrue(self.waitForOperationsCount(of: leased, toReach: 1))
+            XCTAssertEqual(finished.wait(timeout: .now() + 2), .timedOut,
+                           "The NOOP was expected to be blocked on the silent socket")
+            XCTAssertTrue(noop.interruptCurrentCommand())
+            XCTAssertEqual(finished.wait(timeout: .now() + 10), .success,
+                           "interruptCurrentCommand() did not unblock the NOOP")
+
+            // Still "connected" as far as its state goes, but on a stream libetpan will never read
+            // from again. The next command has to start over, and the endpoint sees a second client.
+            let reconnect = session.connectOperation()
+            reconnect.setConnection(leased)
+            XCTAssertEqual(self.start(reconnect).wait(timeout: .now() + 5), .success)
+            XCTAssertEqual(endpoint.acceptedClientCount, 2,
+                           "An interrupted connection must reconnect on its next command, on its own")
+
+            session.releaseConnection(leased, disconnect: false)
         }
     }
 
@@ -287,7 +331,7 @@ final class IMAPConnectionLeaseTests: XCTestCase {
         defer { endpoint.stop() }
 
         let session = makeSession(port: endpoint.port, maximumConnections: 1)
-        session.automaticDisconnectDelay = 1
+        session.session.automaticDisconnectDelay = 1
 
         guard let leased = session.acquireConnection(folder: nil) else {
             return XCTFail("An empty pool with room for 1 connection must satisfy the lease")

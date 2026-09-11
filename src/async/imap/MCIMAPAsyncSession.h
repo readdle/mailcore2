@@ -125,8 +125,7 @@ namespace mailcore {
         /*! Returns a reserved connection to the shared pool and re-arms its idle
          auto-disconnect. With disconnect, tears the socket down first (the connection object
          stays pooled and reconnects on next use) - for servers that pin a mailbox snapshot per
-         connection, and mandatory after interruptCurrentCommand, since a cancelled stream does
-         not recover. Idempotent: releasing a connection that is not reserved does nothing.
+         connection. Idempotent: releasing a connection that is not reserved does nothing.
          Same threading contract as acquireConnection. */
         virtual void releaseConnection(IMAPAsyncConnection * connection, bool disconnect);
         
