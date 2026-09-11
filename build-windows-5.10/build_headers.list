@@ -83,6 +83,7 @@ src\async\smtp\MCSMTPAsyncSession.h
 src\async\smtp\MCSMTPOperation.h
 src\async\smtp\MCSMTPOperationCallback.h
 src\async\imap\MCAsyncIMAP.h
+src\async\imap\MCIMAPAsyncConnection.h
 src\async\imap\MCIMAPAsyncSession.h
 src\async\imap\MCIMAPOperation.h
 src\async\imap\MCIMAPFetchFoldersOperation.h

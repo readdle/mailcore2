@@ -5,6 +5,9 @@
 #include <libetpan/libetpan.h>
 #include <string.h>
 #include <stdlib.h>
+#ifndef _MSC_VER
+#include <sys/time.h>
+#endif
 
 #include "MCDefines.h"
 #include "MCIMAPSearchExpression.h"
@@ -30,6 +33,13 @@
 #include "MCDataStreamDecoder.h"
 
 using namespace mailcore;
+
+static double currentWallClockTime()
+{
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return (double) tv.tv_sec + (double) tv.tv_usec / 1000000.0;
+}
 
 class LoadByChunkProgress : public Object, public IMAPProgressCallback {
 public:
@@ -374,6 +384,7 @@ void IMAPSession::init()
     mConnectionType = ConnectionTypeClear;
     mCheckCertificateEnabled = true;
     mVoIPEnabled = true;
+    mLastLoginTime = 0;
     mQResyncCompatible = true;
     mDelimiter = 0;
     
@@ -1022,6 +1033,12 @@ void IMAPSession::login(ErrorCode * pError)
     MC_SAFE_REPLACE_COPY(String, mLoginResponse, loginResponse);
     
     mState = STATE_LOGGEDIN;
+    // Written from the connection's operation thread, read from the session's dispatch queue:
+    // on a 32-bit ABI an unlocked double is two stores, and a torn read could report a moment
+    // in the future - the one direction in which a caller would wrongly believe the view fresh.
+    LOCK();
+    mLastLoginTime = currentWallClockTime();
+    UNLOCK();
     
     if (isAutomaticConfigurationEnabled()) {
         if ((mImap->imap_connection_info != NULL) && (mImap->imap_connection_info->imap_capability != NULL)) {
@@ -3723,6 +3740,11 @@ void IMAPSession::interruptCurrentCommand()
     LOCK();
     if (mImap != NULL && mImap->imap_stream != NULL) {
         mailstream_cancel(mImap->imap_stream);
+        // libetpan never clears a stream's cancelled state: every read and write on it fails from
+        // here on. The next command must reconnect, and connectIfNeeded does that for this flag,
+        // so the connection stays pooled and heals on its own instead of relying on the caller
+        // to tear it down.
+        mShouldDisconnect = true;
     }
     UNLOCK();
 }
@@ -4396,6 +4418,14 @@ bool IMAPSession::allowsNewPermanentFlags() {
 bool IMAPSession::isDisconnected()
 {
     return mState == STATE_DISCONNECTED;
+}
+
+double IMAPSession::lastLoginTime()
+{
+    LOCK();
+    double lastLoginTime = mLastLoginTime;
+    UNLOCK();
+    return lastLoginTime;
 }
 
 void IMAPSession::setConnectionLogger(ConnectionLogger * logger)

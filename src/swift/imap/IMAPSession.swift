@@ -143,7 +143,62 @@ public class MCOIMAPSession: NSObjectCompat {
         get { return session.maximumConnections }
         set { session.maximumConnections = newValue }
     }
-    
+
+    /**
+     Reserves one connection of the pool for exclusive use: the regular per-operation selection
+     stops seeing it, so new commands run on it only when explicitly pointed at it with
+     MCOIMAPBaseOperation.setConnection(_:), and the idle auto-disconnect stands down until
+     release. Exclusivity is forward-only: operations already queued on the connection still
+     run ahead of the lease holder's (with folder concurrent access allowed, selection prefers
+     an idle or new connection, so a backlog is only possible with the pool at its limit;
+     without it, a busy connection selected to the folder is taken as is).
+
+     Returns nil when every connection is already reserved - callers must then fall back to the
+     shared pool.
+
+     The reverse degradation is the one to size for, because a holder cannot detect it. While the
+     pool is at its limit and every connection is reserved, the ordinary per-operation selection
+     stops finding a free connection and shares the least busy reserved one: that operation runs
+     on somebody's leased connection and SELECTs its own mailbox there, which is exactly the
+     cross-talk a lease exists to prevent. The holder is given no signal - no callback, no flag -
+     so exclusivity is a guarantee only while maximumConnections exceeds the number of
+     simultaneous leases, and nothing enforces that. The default is DEFAULT_MAX_CONNECTIONS (3),
+     so three concurrent leases are enough to reach it. Every acquired connection
+     must be handed back with releaseConnection(_:disconnect:): a leaked lease permanently
+     degrades the pool — the connection is never handed out exclusively again and, at the
+     limit, falls back to being shared.
+
+     Reservation state is guarded, but that only makes it readable - it does not make the lease
+     safe on its own. Selection reads it from within MCOIMAPBaseOperation.start, on whatever
+     thread calls that, so an acquire racing a start can hand the same connection to both: the
+     start sees it free, the acquire reserves it, and the operation is already queued. Serialize
+     acquireConnection and releaseConnection with every start() on this session, on a queue of
+     your choosing.
+     */
+    public func acquireConnection(folder: String?) -> MCOIMAPAsyncConnection? {
+        return mailCoreAutoreleasePool {
+            let connection = session.acquireConnection(folder?.mailCoreString() ?? MailCoreString())
+            guard connection.instance != nil else {
+                return nil
+            }
+            return MCOIMAPAsyncConnection(connection: connection, session: self)
+        }
+    }
+
+    /**
+     Returns an acquired connection to the shared pool and re-arms its idle auto-disconnect.
+
+     With disconnect, the socket is torn down first (the connection object stays pooled and
+     reconnects on next use) - for servers that pin a mailbox snapshot per connection.
+     Idempotent: releasing a connection that is not reserved does nothing. Same threading
+     contract as acquireConnection(folder:).
+     */
+    public func releaseConnection(_ connection: MCOIMAPAsyncConnection, disconnect: Bool) {
+        mailCoreAutoreleasePool {
+            session.releaseConnection(connection.connection, connection.leaseGeneration, disconnect)
+        }
+    }
+
     /**
      Sets logger callback. The network traffic will be sent to this block.
      

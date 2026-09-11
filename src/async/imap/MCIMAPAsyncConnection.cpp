@@ -108,10 +108,14 @@ IMAPAsyncConnection::IMAPAsyncConnection()
     mOwner = NULL;
     mConnectionLogger = NULL;
     MCB_LOCK_INIT(&mConnectionLoggerLock);
+    MCB_LOCK_INIT(&mReservationLock);
     mInternalLogger = new IMAPConnectionLogger(this);
     mAutomaticConfigurationEnabled = true;
     mQueueRunning = false;
     mScheduledAutomaticDisconnect = false;
+    mReserved = false;
+    mLeaseGeneration = 0;
+    mAutomaticDisconnectDelay = 30;
 }
 
 IMAPAsyncConnection::~IMAPAsyncConnection()
@@ -122,6 +126,7 @@ IMAPAsyncConnection::~IMAPAsyncConnection()
     cancelDelayedPerformMethod((Object::Method) &IMAPAsyncConnection::tryAutomaticDisconnectAfterDelay, NULL);
 #endif
     MCB_LOCK_DESTROY(&mConnectionLoggerLock);
+    MCB_LOCK_DESTROY(&mReservationLock);
     MC_SAFE_RELEASE(mInternalLogger);
     MC_SAFE_RELEASE(mQueueCallback);
     MC_SAFE_RELEASE(mLastFolder);
@@ -281,6 +286,11 @@ IMAPSession * IMAPAsyncConnection::session()
     return mSession;
 }
 
+double IMAPAsyncConnection::lastLoginTime()
+{
+    return mSession->lastLoginTime();
+}
+
 unsigned int IMAPAsyncConnection::operationsCount()
 {
     return mQueue->count();
@@ -289,6 +299,54 @@ unsigned int IMAPAsyncConnection::operationsCount()
 void IMAPAsyncConnection::cancelAllOperations()
 {
     mQueue->cancelAllOperations();
+}
+
+unsigned int IMAPAsyncConnection::leaseGeneration()
+{
+    MCB_LOCK(&mReservationLock);
+    unsigned int generation = mLeaseGeneration;
+    MCB_UNLOCK(&mReservationLock);
+    return generation;
+}
+
+bool IMAPAsyncConnection::reserve()
+{
+    MCB_LOCK(&mReservationLock);
+    bool reserved = !mReserved;
+    if (reserved) {
+        mReserved = true;
+        mLeaseGeneration ++;
+    }
+    MCB_UNLOCK(&mReservationLock);
+    return reserved;
+}
+
+bool IMAPAsyncConnection::endLease(unsigned int leaseGeneration, bool disconnect)
+{
+    IMAPOperation * op = disconnect ? disconnectOperation() : NULL;
+    MCB_LOCK(&mReservationLock);
+    bool ended = mReserved && mLeaseGeneration == leaseGeneration;
+    if (ended) {
+        if (op != NULL) {
+            op->start();
+        }
+        mReserved = false;
+    }
+    MCB_UNLOCK(&mReservationLock);
+    return ended;
+}
+
+bool IMAPAsyncConnection::isReserved()
+{
+    MCB_LOCK(&mReservationLock);
+    bool reserved = mReserved;
+    MCB_UNLOCK(&mReservationLock);
+    return reserved;
+}
+
+void IMAPAsyncConnection::setAutomaticDisconnectDelay(time_t delay)
+{
+    mAutomaticDisconnectDelay = delay;
 }
 
 bool IMAPAsyncConnection::interruptCurrentCommand(IMAPOperation * operation)
@@ -336,9 +394,9 @@ void IMAPAsyncConnection::tryAutomaticDisconnect()
     mOwner->retain();
     mScheduledAutomaticDisconnect = true;
 #if MC_HAS_GCD
-    performMethodOnDispatchQueueAfterDelay((Object::Method) &IMAPAsyncConnection::tryAutomaticDisconnectAfterDelay, NULL, dispatchQueue(), 30);
+    performMethodOnDispatchQueueAfterDelay((Object::Method) &IMAPAsyncConnection::tryAutomaticDisconnectAfterDelay, NULL, dispatchQueue(), (double) mAutomaticDisconnectDelay);
 #else
-    performMethodAfterDelay((Object::Method) &IMAPAsyncConnection::tryAutomaticDisconnectAfterDelay, NULL, 30);
+    performMethodAfterDelay((Object::Method) &IMAPAsyncConnection::tryAutomaticDisconnectAfterDelay, NULL, (double) mAutomaticDisconnectDelay);
 #endif
 
     if (scheduledAutomaticDisconnect) {
@@ -346,12 +404,50 @@ void IMAPAsyncConnection::tryAutomaticDisconnect()
     }
 }
 
+void IMAPAsyncConnection::scheduleAutomaticDisconnect()
+{
+    // Both kept alive until the hop lands: the block holds raw pointers, and a session dropped
+    // by its last user right after a release would otherwise take this connection with it
+    // before the block runs. Same pairing as the timer's own retain of the owner.
+    mOwner->retain();
+    retain();
+#if MC_HAS_GCD
+    performMethodOnDispatchQueue((Object::Method) &IMAPAsyncConnection::scheduleAutomaticDisconnectOnQueue, NULL, dispatchQueue());
+#else
+    performMethodOnMainThread((Object::Method) &IMAPAsyncConnection::scheduleAutomaticDisconnectOnQueue, NULL);
+#endif
+}
+
+void IMAPAsyncConnection::scheduleAutomaticDisconnectOnQueue(void * context)
+{
+    IMAPAsyncSession * owner = mOwner;
+    tryAutomaticDisconnect();
+    release();
+    owner->release();
+}
+
 void IMAPAsyncConnection::tryAutomaticDisconnectAfterDelay(void * context)
 {
     mScheduledAutomaticDisconnect = false;
 
     IMAPOperation * op = disconnectOperation();
+    // Checked and enqueued under the reservation lock, so an acquire on another thread lands
+    // either before the check - and the timer stands down - or after the enqueue - and the
+    // lease inherits a disconnect already queued ahead of its first command, which costs it a
+    // login and nothing else. Without the lock the disconnect could be enqueued after the
+    // reservation was published, and close the socket under a holder mid-operation.
+    MCB_LOCK(&mReservationLock);
+    if (mReserved) {
+        // A lease holder is between commands: leave its connection alone and let the timer
+        // die. Re-arming here instead would keep an owner retain and a periodic wakeup alive
+        // for as long as the lease is held - forever, if the lease leaks. releaseConnection
+        // arms the timer anew when the connection returns to the pool.
+        MCB_UNLOCK(&mReservationLock);
+        mOwner->release();
+        return;
+    }
     op->start();
+    MCB_UNLOCK(&mReservationLock);
 
     mOwner->release();
 }

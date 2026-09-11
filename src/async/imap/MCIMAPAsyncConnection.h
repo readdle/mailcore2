@@ -93,6 +93,9 @@ namespace mailcore {
         
         virtual IMAPOperation * disconnectOperation();
 
+        // How long an idle connection stays open once its queue drains.
+        virtual void setAutomaticDisconnectDelay(time_t delay);
+
     private:
         IMAPSession * mSession;
         OperationQueue * mQueue;
@@ -107,8 +110,15 @@ namespace mailcore {
         bool mAutomaticConfigurationEnabled;
         bool mQueueRunning;
         bool mScheduledAutomaticDisconnect;
+        // Guarded: the session writes these while acquiring or releasing, and reads them back
+        // from sessionWithMinQueue, which runs on whatever thread called IMAPOperation::start.
+        MCB_LOCK_TYPE mReservationLock;
+        bool mReserved;
+        unsigned int mLeaseGeneration;
+        time_t mAutomaticDisconnectDelay;
         
         virtual void tryAutomaticDisconnectAfterDelay(void * context);
+        virtual void scheduleAutomaticDisconnectOnQueue(void * context);
 
     public: // private
         virtual void runOperation(IMAPOperation * operation);
@@ -116,12 +126,38 @@ namespace mailcore {
         
         virtual void cancelAllOperations();
         virtual bool interruptCurrentCommand(IMAPOperation * operation);
+
+        // Wall-clock moment of this connection's last successful LOGIN (see
+        // IMAPSession::lastLoginTime), 0 when it has never logged in.
+        virtual double lastLoginTime();
         virtual unsigned int operationsCount();
+
+        // A reserved connection belongs to one lease holder: the session selection skips it,
+        // so only operations explicitly pointed at it (IMAPOperation::setSession) run there.
+        // reserve() fails on a connection already reserved; endLease() fails unless the
+        // connection is reserved under exactly that lease generation. Each is one step under the
+        // reservation lock, so a release racing an acquire from another thread cannot slip a
+        // check past a set - and endLease enqueues its disconnect before unreserving, so no
+        // newcomer lands ahead of it.
+        virtual bool reserve();
+        virtual bool endLease(unsigned int leaseGeneration, bool disconnect);
+        virtual bool isReserved();
+
+        // Counts the reservations this connection has had. Reserving bumps it, so a holder that
+        // remembers the value it saw can tell its own lease from the next one on the same
+        // connection — which is what stops a late release from cancelling somebody else's lease
+        // (see IMAPAsyncSession::releaseConnection).
+        virtual unsigned int leaseGeneration();
         
         virtual void setLastFolder(String * folder);
         virtual String * lastFolder();
         
         virtual void tryAutomaticDisconnect();
+        // tryAutomaticDisconnect for a caller on a foreign thread - a lease release. The idle
+        // timer's bookkeeping (the scheduled flag, the owner retain it holds) is touched only
+        // from the connection's dispatch queue, where the timer fires and the drain re-arms it;
+        // this hops there instead of joining in from outside.
+        virtual void scheduleAutomaticDisconnect();
         virtual void queueStartRunning();
         virtual void queueStoppedRunning();
         
