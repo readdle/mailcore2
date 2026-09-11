@@ -327,7 +327,7 @@ IMAPAsyncConnection * IMAPAsyncSession::sessionForFolder(String * folder, bool u
             // in urgent mode try reuse any available session with
             // empty queue or create new one, if maximum connections limit does not reached.
             s = availableSession();
-            if (s != NULL && s->operationsCount() == 0) {
+            if (s->operationsCount() == 0) {
                 if (!s->isReserved()) {
                     s->setLastFolder(folder);
                 }
@@ -340,7 +340,7 @@ IMAPAsyncConnection * IMAPAsyncSession::sessionForFolder(String * folder, bool u
         // the lease holder, and an acquireConnection call that lands here runs no operation at
         // all - stamping the hint would desync it from the actually selected mailbox.
         s = matchingSessionForFolder(folder);
-        if (s != NULL && !s->isReserved()) {
+        if (!s->isReserved()) {
             s->setLastFolder(folder);
         }
         return s;
@@ -410,7 +410,6 @@ IMAPAsyncConnection * IMAPAsyncSession::sessionWithMinQueue(bool filterByFolder,
     for (unsigned int i = 0 ; i < mSessions->count() ; i ++) {
         IMAPAsyncConnection * s = (IMAPAsyncConnection *) mSessions->objectAtIndex(i);
         if ((chosenSession == NULL) || (s->operationsCount() < minOperationsCount)) {
-            // a reserved session serves its lease holder exclusively
             bool matched = includeReserved || !s->isReserved();
             if (matched && filterByFolder) {
                 // filter by last selested folder
@@ -457,6 +456,9 @@ void IMAPAsyncSession::releaseConnection(IMAPAsyncConnection * connection, bool 
     }
     else {
         connection->setReserved(false);
+        // tryAutomaticDisconnect's own precondition - that no thread is running a command on the
+        // connection - is the caller's to keep here: a lease is released when its holder is done
+        // with it, and mailcore's other call site is the queue draining.
         // The idle timer died if it fired during the lease; arm it anew so a pooled connection
         // nobody picks up still goes away. On the disconnect path the drain after the
         // disconnect operation re-arms it the regular way.

@@ -95,7 +95,6 @@ namespace mailcore {
 
         // How long an idle connection stays open once its queue drains.
         virtual void setAutomaticDisconnectDelay(time_t delay);
-        virtual time_t automaticDisconnectDelay();
 
     private:
         IMAPSession * mSession;
