@@ -270,7 +270,13 @@ namespace mailcore {
          predicate ( lastFolder() EQUALS TO @param folder ). In case of param folder is NULL
          the function would search a session among non-selected ones.
          Reserved sessions are skipped unless @param includeReserved is true. */
-        virtual IMAPAsyncConnection * sessionWithMinQueue(bool filterByFolder, String * folder, bool includeReserved = false);
+        virtual IMAPAsyncConnection * sessionWithMinQueue(bool filterByFolder, String * folder);
+        // The same pick, allowed to consider connections a lease has reserved - for the fallback
+        // in availableSession, and nothing else. An overload rather than a default argument on
+        // the declaration above: a default argument is bound statically, so an override in a
+        // subclass would silently keep the old behaviour, and the upstream declaration stays as
+        // it is, which is one line fewer to resolve when this fork catches up.
+        virtual IMAPAsyncConnection * sessionWithMinQueue(bool filterByFolder, String * folder, bool includeReserved);
         /*! Returns existant or new session with empty operation queue, if it can.
          Otherwise, returns the session with the minimum size of the operation queue. */
         virtual IMAPAsyncConnection * availableSession();

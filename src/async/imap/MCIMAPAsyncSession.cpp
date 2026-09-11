@@ -402,6 +402,11 @@ IMAPAsyncConnection * IMAPAsyncSession::matchingSessionForFolder(String * folder
     return availableSession();
 }
 
+IMAPAsyncConnection * IMAPAsyncSession::sessionWithMinQueue(bool filterByFolder, String * folder)
+{
+    return sessionWithMinQueue(filterByFolder, folder, false);
+}
+
 IMAPAsyncConnection * IMAPAsyncSession::sessionWithMinQueue(bool filterByFolder, String * folder, bool includeReserved)
 {
     IMAPAsyncConnection * chosenSession = NULL;

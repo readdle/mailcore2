@@ -166,6 +166,62 @@ final class IMAPConnectionLeaseTests: XCTestCase {
     /// The one case where exclusivity gives way: a fully reserved pool at its connection limit
     /// shares the least busy reserved connection with regular operations instead of crashing on
     /// a NULL session.
+    /// Every other test leases with folder: nil, which takes acquireConnection's availableSession
+    /// path and leaves the folder branch — both of the hunks that modify sessionForFolder — with
+    /// no coverage at all. Those are the hunks that have to behave exactly as upstream does when
+    /// nothing is reserved, so they are the ones worth pinning.
+    func testAcquireWithAFolderSkipsReservedConnections() throws {
+        let endpoint = try LeaseTestTCPEndpoint()
+        defer { endpoint.stop() }
+
+        let session = makeSession(port: endpoint.port, maximumConnections: 2)
+
+        guard let first = session.acquireConnection(folder: "INBOX") else {
+            return XCTFail("An empty pool with room for 2 connections must satisfy the lease")
+        }
+        XCTAssertTrue(first.isReserved)
+
+        // The same folder again: the connection already selected to it is reserved, so the pick
+        // must create the second one rather than hand the first out twice.
+        guard let second = session.acquireConnection(folder: "INBOX") else {
+            return XCTFail("The pool had room for a second connection")
+        }
+        XCTAssertTrue(second.isReserved)
+        XCTAssertNotEqual(first.identity, second.identity,
+                          "a reserved connection must never be handed to a second holder")
+
+        XCTAssertNil(session.acquireConnection(folder: "INBOX"),
+                     "with both connections reserved the pool has nothing left to lease")
+        XCTAssertNil(session.acquireConnection(folder: "Archive"),
+                     "and a different folder does not change that")
+
+        session.releaseConnection(first, disconnect: false)
+        session.releaseConnection(second, disconnect: false)
+    }
+
+    /// A release is refused for a connection that belongs to another session's pool: it would
+    /// clear a reservation that session is relying on and queue a disconnect on a connection this
+    /// one has no claim to.
+    func testReleaseIgnoresAConnectionFromAnotherSession() throws {
+        let endpoint = try LeaseTestTCPEndpoint()
+        defer { endpoint.stop() }
+
+        let owner = makeSession(port: endpoint.port, maximumConnections: 1)
+        let stranger = makeSession(port: endpoint.port, maximumConnections: 1)
+
+        guard let leased = owner.acquireConnection(folder: nil) else {
+            return XCTFail("An empty pool with room for 1 connection must satisfy the lease")
+        }
+
+        stranger.releaseConnection(leased, disconnect: true)
+
+        XCTAssertTrue(leased.isReserved, "another session must not be able to end this lease")
+        XCTAssertNil(owner.acquireConnection(folder: nil),
+                     "the owning pool must still consider its only connection leased")
+
+        owner.releaseConnection(leased, disconnect: false)
+    }
+
     func testExhaustedPoolSharesTheLeasedConnection() throws {
         let endpoint = try LeaseTestTCPEndpoint()
         defer { endpoint.stop() }
