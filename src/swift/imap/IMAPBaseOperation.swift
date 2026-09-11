@@ -38,8 +38,10 @@ public class MCOIMAPBaseOperation : MCOOperation {
      is rebuilt on next use, so call it for a command being abandoned, never to hurry up one whose
      result still matters.
 
-     - Returns: whether a command was actually interrupted, i.e. whether this operation was the one
-     running. `false` means nothing was holding the connection on its behalf.
+     - Returns: whether this operation was the one the queue was running at that moment. That may
+     include a command that finished just as the interrupt landed: its result is intact, but the
+     stream is cancelled all the same. `false` means nothing was holding the connection on this
+     operation's behalf.
      */
     @discardableResult
     public func interruptCurrentCommand() -> Bool {
