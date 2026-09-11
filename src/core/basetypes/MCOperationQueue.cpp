@@ -68,10 +68,12 @@ bool OperationQueue::interruptRunningOperation(Operation * op)
 {
     bool interrupted = false;
 
-    // interrupt() runs with the lock held on purpose: releasing it first would let the operation
-    // finish and the next one start before the interruption lands, which is precisely the mistake
-    // this method exists to prevent. It is safe as long as interrupt() implementations stay
-    // non-blocking and never reach back into this queue.
+    // interrupt() runs with the lock held on purpose: releasing it first would let the next
+    // operation start before the interruption lands, and it would be that one getting cut. The
+    // lock cannot keep op itself from finishing - main() runs without it - so an interrupt may
+    // still arrive just after the command completed; that costs a reconnect, nothing worse.
+    // Safe as long as interrupt() implementations stay non-blocking and never reach back into
+    // this queue.
     MCB_LOCK(&mLock);
     if ((op != NULL) && (mRunningOperation == op)) {
         op->interrupt();
