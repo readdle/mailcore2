@@ -20,6 +20,7 @@ extern "C" {
     C_SYNTHESIZE_STRUCT_DEFINITION(CIMAPAsyncConnection, mailcore::IMAPAsyncConnection)
 
     C_SYNTHESIZE_READONLY_PROPERTY_DEFINITION(CIMAPAsyncConnection, bool, isReserved)
+    C_SYNTHESIZE_READONLY_PROPERTY_DEFINITION(CIMAPAsyncConnection, unsigned int, leaseGeneration)
     C_SYNTHESIZE_READONLY_PROPERTY_DEFINITION(CIMAPAsyncConnection, unsigned int, operationsCount)
     C_SYNTHESIZE_READONLY_PROPERTY_DEFINITION(CIMAPAsyncConnection, double, lastLoginTime)
 

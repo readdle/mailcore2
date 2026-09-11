@@ -105,9 +105,16 @@ namespace mailcore {
          forward-only: operations already queued on the connection still run ahead of the lease
          holder's (selection prefers an idle or new connection, so a backlog is only possible
          with the pool at its limit). Returns NULL when every connection is already reserved -
-         the pool has nothing left to hand out exclusively. While the pool is at its limit and
-         fully reserved, regular operations fall back to sharing the least busy reserved
-         connection, so size maximumConnections against the number of simultaneous leases.
+         the pool has nothing left to hand out exclusively.
+
+         The reverse degradation is the one to size for, because a holder cannot detect it. While
+         the pool is at its limit and every connection is reserved, the ordinary per-operation
+         selection stops finding a free connection and shares the least busy reserved one: that
+         operation runs on somebody's leased connection and SELECTs its own mailbox there, which
+         is exactly the cross-talk a lease exists to prevent. The holder is given no signal, so
+         exclusivity holds only while maximumConnections exceeds the number of simultaneous
+         leases, and nothing enforces that - DEFAULT_MAX_CONNECTIONS is 3, so three concurrent
+         leases are enough to reach it.
          Reservation state is as unsynchronized as the rest of the session selection: call
          acquireConnection/releaseConnection on the session's dispatch queue (where operations
          start), or serialize them with it externally. */

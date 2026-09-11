@@ -113,6 +113,7 @@ IMAPAsyncConnection::IMAPAsyncConnection()
     mQueueRunning = false;
     mScheduledAutomaticDisconnect = false;
     mReserved = false;
+    mLeaseGeneration = 0;
     mAutomaticDisconnectDelay = 30;
 }
 
@@ -298,8 +299,16 @@ void IMAPAsyncConnection::cancelAllOperations()
     mQueue->cancelAllOperations();
 }
 
+unsigned int IMAPAsyncConnection::leaseGeneration()
+{
+    return mLeaseGeneration;
+}
+
 void IMAPAsyncConnection::setReserved(bool reserved)
 {
+    if (reserved && !mReserved) {
+        mLeaseGeneration ++;
+    }
     mReserved = reserved;
 }
 

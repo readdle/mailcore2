@@ -111,6 +111,7 @@ namespace mailcore {
         bool mQueueRunning;
         bool mScheduledAutomaticDisconnect;
         bool mReserved;
+        unsigned int mLeaseGeneration;
         time_t mAutomaticDisconnectDelay;
         
         virtual void tryAutomaticDisconnectAfterDelay(void * context);
@@ -131,6 +132,12 @@ namespace mailcore {
         // so only operations explicitly pointed at it (IMAPOperation::setSession) run there.
         virtual void setReserved(bool reserved);
         virtual bool isReserved();
+
+        // Counts the reservations this connection has had. Reserving bumps it, so a holder that
+        // remembers the value it saw can tell its own lease from the next one on the same
+        // connection — which is what stops a late release from cancelling somebody else's lease
+        // (see IMAPAsyncSession::releaseConnection).
+        virtual unsigned int leaseGeneration();
         
         virtual void setLastFolder(String * folder);
         virtual String * lastFolder();

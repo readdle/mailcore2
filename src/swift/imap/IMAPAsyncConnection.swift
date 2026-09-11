@@ -16,13 +16,37 @@ public class MCOIMAPAsyncConnection: NSObjectCompat {
 
     internal var connection: CIMAPAsyncConnection
 
-    internal init(connection: CIMAPAsyncConnection) {
+    /// The session this lease came from, held so it cannot be destroyed first: the C++ connection
+    /// keeps a raw pointer back to its owner and reaches through it on every operation, so an
+    /// outlived session is a use-after-free rather than a nil check.
+    private let session: MCOIMAPSession
+
+    /// The reservation this handle was made for. A connection released and acquired again is a
+    /// different lease on the same object, and a release carrying this value is refused once that
+    /// has happened — otherwise a duplicated cleanup path (a defer plus an explicit release, an
+    /// error path plus a normal one) cancels the next holder's lease and tears down the socket
+    /// underneath it.
+    internal let leaseGeneration: UInt32
+
+    internal init(connection: CIMAPAsyncConnection, session: MCOIMAPSession) {
         self.connection = connection
+        self.session = session
+        self.leaseGeneration = connection.leaseGeneration
         self.connection.retain()
     }
 
+    /// Returns the lease if its holder never did. A leaked lease is permanent otherwise — nothing
+    /// in the pool clears a reservation on its own — and the connection would be lost to the pool
+    /// for the life of the session. Torn down rather than pooled: a holder that lost track of its
+    /// lease cannot have left the connection in a state anybody should inherit.
     deinit {
+        session.releaseConnection(self, disconnect: true)
         connection.release()
+    }
+
+    /// Whether this handle still names the lease it was created for.
+    internal var isCurrentLease: Bool {
+        return connection.isReserved && connection.leaseGeneration == leaseGeneration
     }
 
     /** Whether the connection is currently reserved by a lease. */

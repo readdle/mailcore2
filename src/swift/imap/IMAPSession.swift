@@ -162,9 +162,16 @@ public class MCOIMAPSession: NSObjectCompat {
      is only possible with the pool at its limit).
 
      Returns nil when every connection is already reserved - callers must then fall back to the
-     shared pool. The reverse degradation exists too: while the pool is at its limit and fully
-     reserved, regular operations share the least busy reserved connection, so size
-     maximumConnections against the number of simultaneous leases. Every acquired connection
+     shared pool.
+
+     The reverse degradation is the one to size for, because a holder cannot detect it. While the
+     pool is at its limit and every connection is reserved, the ordinary per-operation selection
+     stops finding a free connection and shares the least busy reserved one: that operation runs
+     on somebody's leased connection and SELECTs its own mailbox there, which is exactly the
+     cross-talk a lease exists to prevent. The holder is given no signal - no callback, no flag -
+     so exclusivity is a guarantee only while maximumConnections exceeds the number of
+     simultaneous leases, and nothing enforces that. The default is DEFAULT_MAX_CONNECTIONS (3),
+     so three concurrent leases are enough to reach it. Every acquired connection
      must be handed back with releaseConnection(_:disconnect:): a leaked lease permanently
      degrades the pool — the connection is never handed out exclusively again and, at the
      limit, falls back to being shared.
@@ -179,7 +186,7 @@ public class MCOIMAPSession: NSObjectCompat {
             guard connection.instance != nil else {
                 return nil
             }
-            return MCOIMAPAsyncConnection(connection: connection)
+            return MCOIMAPAsyncConnection(connection: connection, session: self)
         }
     }
 
@@ -193,6 +200,12 @@ public class MCOIMAPSession: NSObjectCompat {
      contract as acquireConnection(folder:).
      */
     public func releaseConnection(_ connection: MCOIMAPAsyncConnection, disconnect: Bool) {
+        // Refused once this handle no longer names the lease it was made for: by then the
+        // connection is either back in the pool or leased to somebody else, and going through
+        // would clear their reservation and queue a disconnect under them.
+        guard connection.isCurrentLease else {
+            return
+        }
         mailCoreAutoreleasePool {
             session.releaseConnection(connection.connection, disconnect)
         }

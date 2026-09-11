@@ -281,6 +281,60 @@ final class IMAPConnectionLeaseTests: XCTestCase {
         }
     }
 
+    /// The release that matters is not the duplicated one, but the duplicated one that lands
+    /// AFTER somebody else has taken the same connection. Without a lease token the second
+    /// release passes every check — the connection is reserved, by this session — and clears the
+    /// new holder's reservation while queueing a disconnect under it.
+    func testStaleReleaseDoesNotCancelTheNextLease() throws {
+        let endpoint = try LeaseTestTCPEndpoint(greeting: "* OK [CAPABILITY IMAP4rev1] LeaseTestTCPEndpoint ready\r\n")
+        defer { endpoint.stop() }
+
+        let session = makeSession(port: endpoint.port, maximumConnections: 1)
+
+        guard let first = session.acquireConnection(folder: nil) else {
+            return XCTFail("An empty pool with room for 1 connection must satisfy the lease")
+        }
+        session.releaseConnection(first, disconnect: false)
+
+        guard let second = session.acquireConnection(folder: nil) else {
+            return XCTFail("The released connection must be available again")
+        }
+        XCTAssertTrue(second.isReserved)
+
+        // The first holder's cleanup runs a second time — a defer after an explicit release, an
+        // error path after a normal one.
+        session.releaseConnection(first, disconnect: true)
+
+        XCTAssertTrue(second.isReserved, "a stale release must not free the lease that replaced it")
+        XCTAssertNil(session.acquireConnection(folder: nil),
+                     "the pool must still consider its only connection leased")
+
+        session.releaseConnection(second, disconnect: false)
+    }
+
+    /// Nothing in the pool clears a reservation on its own, so a holder that loses track of its
+    /// lease would cost the pool that connection for the life of the session. The handle returns
+    /// the lease when it goes away.
+    func testDroppingTheHandleReturnsTheLease() throws {
+        let endpoint = try LeaseTestTCPEndpoint(greeting: "* OK [CAPABILITY IMAP4rev1] LeaseTestTCPEndpoint ready\r\n")
+        defer { endpoint.stop() }
+
+        let session = makeSession(port: endpoint.port, maximumConnections: 1)
+
+        do {
+            guard let leaked = session.acquireConnection(folder: nil) else {
+                return XCTFail("An empty pool with room for 1 connection must satisfy the lease")
+            }
+            XCTAssertTrue(leaked.isReserved)
+            XCTAssertNil(session.acquireConnection(folder: nil), "the only connection is leased")
+        }
+
+        guard let reacquired = session.acquireConnection(folder: nil) else {
+            return XCTFail("A dropped handle must have returned its lease to the pool")
+        }
+        session.releaseConnection(reacquired, disconnect: false)
+    }
+
     func testReleaseIsIdempotent() throws {
         let endpoint = try LeaseTestTCPEndpoint(greeting: "* OK [CAPABILITY IMAP4rev1] LeaseTestTCPEndpoint ready\r\n")
         defer { endpoint.stop() }
