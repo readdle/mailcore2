@@ -110,6 +110,9 @@ namespace mailcore {
         bool mAutomaticConfigurationEnabled;
         bool mQueueRunning;
         bool mScheduledAutomaticDisconnect;
+        // Guarded: the session writes these while acquiring or releasing, and reads them back
+        // from sessionWithMinQueue, which runs on whatever thread called IMAPOperation::start.
+        MCB_LOCK_TYPE mReservationLock;
         bool mReserved;
         unsigned int mLeaseGeneration;
         time_t mAutomaticDisconnectDelay;

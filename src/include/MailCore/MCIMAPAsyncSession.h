@@ -115,9 +115,12 @@ namespace mailcore {
          exclusivity holds only while maximumConnections exceeds the number of simultaneous
          leases, and nothing enforces that - DEFAULT_MAX_CONNECTIONS is 3, so three concurrent
          leases are enough to reach it.
-         Reservation state is as unsynchronized as the rest of the session selection: call
-         acquireConnection/releaseConnection on the session's dispatch queue (where operations
-         start), or serialize them with it externally. */
+         Reservation state is guarded, but that only makes it readable - it does not make the
+         lease safe on its own. Selection reads it from sessionWithMinQueue, which runs wherever
+         IMAPOperation::start was called, so an acquire racing a start can hand the same
+         connection to both: the start sees it free, the acquire reserves it, and the operation
+         is already queued. Serialize acquireConnection and releaseConnection with every
+         start() on this session, on a queue of your choosing. */
         virtual IMAPAsyncConnection * acquireConnection(String * folder);
         /*! Returns a reserved connection to the shared pool and re-arms its idle
          auto-disconnect. With disconnect, tears the socket down first (the connection object

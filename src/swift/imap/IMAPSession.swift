@@ -176,9 +176,12 @@ public class MCOIMAPSession: NSObjectCompat {
      degrades the pool — the connection is never handed out exclusively again and, at the
      limit, falls back to being shared.
 
-     Reservation state is as unsynchronized as the rest of the session's connection selection:
-     call acquireConnection/releaseConnection on the session's dispatchQueue (where operations
-     start), or serialize them with it externally.
+     Reservation state is guarded, but that only makes it readable - it does not make the lease
+     safe on its own. Selection reads it from within MCOIMAPBaseOperation.start, on whatever
+     thread calls that, so an acquire racing a start can hand the same connection to both: the
+     start sees it free, the acquire reserves it, and the operation is already queued. Serialize
+     acquireConnection and releaseConnection with every start() on this session, on a queue of
+     your choosing.
      */
     public func acquireConnection(folder: String?) -> MCOIMAPAsyncConnection? {
         return mailCoreAutoreleasePool {

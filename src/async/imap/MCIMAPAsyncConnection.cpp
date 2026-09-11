@@ -108,6 +108,7 @@ IMAPAsyncConnection::IMAPAsyncConnection()
     mOwner = NULL;
     mConnectionLogger = NULL;
     MCB_LOCK_INIT(&mConnectionLoggerLock);
+    MCB_LOCK_INIT(&mReservationLock);
     mInternalLogger = new IMAPConnectionLogger(this);
     mAutomaticConfigurationEnabled = true;
     mQueueRunning = false;
@@ -125,6 +126,7 @@ IMAPAsyncConnection::~IMAPAsyncConnection()
     cancelDelayedPerformMethod((Object::Method) &IMAPAsyncConnection::tryAutomaticDisconnectAfterDelay, NULL);
 #endif
     MCB_LOCK_DESTROY(&mConnectionLoggerLock);
+    MCB_LOCK_DESTROY(&mReservationLock);
     MC_SAFE_RELEASE(mInternalLogger);
     MC_SAFE_RELEASE(mQueueCallback);
     MC_SAFE_RELEASE(mLastFolder);
@@ -301,20 +303,28 @@ void IMAPAsyncConnection::cancelAllOperations()
 
 unsigned int IMAPAsyncConnection::leaseGeneration()
 {
-    return mLeaseGeneration;
+    MCB_LOCK(&mReservationLock);
+    unsigned int generation = mLeaseGeneration;
+    MCB_UNLOCK(&mReservationLock);
+    return generation;
 }
 
 void IMAPAsyncConnection::setReserved(bool reserved)
 {
+    MCB_LOCK(&mReservationLock);
     if (reserved && !mReserved) {
         mLeaseGeneration ++;
     }
     mReserved = reserved;
+    MCB_UNLOCK(&mReservationLock);
 }
 
 bool IMAPAsyncConnection::isReserved()
 {
-    return mReserved;
+    MCB_LOCK(&mReservationLock);
+    bool reserved = mReserved;
+    MCB_UNLOCK(&mReservationLock);
+    return reserved;
 }
 
 void IMAPAsyncConnection::setAutomaticDisconnectDelay(time_t delay)
@@ -381,7 +391,7 @@ void IMAPAsyncConnection::tryAutomaticDisconnectAfterDelay(void * context)
 {
     mScheduledAutomaticDisconnect = false;
 
-    if (mReserved) {
+    if (isReserved()) {
         // A lease holder is between commands: leave its connection alone and let the timer
         // die. Re-arming here instead would keep an owner retain and a periodic wakeup alive
         // for as long as the lease is held - forever, if the lease leaks. releaseConnection
