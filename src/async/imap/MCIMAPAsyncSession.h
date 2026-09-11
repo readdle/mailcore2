@@ -93,6 +93,46 @@ namespace mailcore {
         
         virtual void setMaximumConnections(unsigned int maxConnections);
         virtual unsigned int maximumConnections();
+
+        // How long an idle connection stays open once its queue drains, in seconds.
+        // Applied to connections created after the change.
+        virtual void setAutomaticDisconnectDelay(time_t delay);
+        virtual time_t automaticDisconnectDelay();
+
+        /*! Reserves a connection for exclusive use: the regular per-operation selection stops
+         seeing it, so only operations explicitly pointed at it (IMAPOperation::setSession) run
+         there, and the idle auto-disconnect stands down until release. Exclusivity is
+         forward-only: operations already queued on the connection still run ahead of the lease
+         holder's (with folder concurrent access allowed, selection prefers an idle or new
+         connection, so a backlog is only possible with the pool at its limit; without it, a busy
+         connection selected to the folder is taken as is). Returns NULL when every connection
+         is already reserved -
+         the pool has nothing left to hand out exclusively.
+
+         The reverse degradation is the one to size for, because a holder cannot detect it. While
+         the pool is at its limit and every connection is reserved, the ordinary per-operation
+         selection stops finding a free connection and shares the least busy reserved one: that
+         operation runs on somebody's leased connection and SELECTs its own mailbox there, which
+         is exactly the cross-talk a lease exists to prevent. The holder is given no signal, so
+         exclusivity holds only while maximumConnections exceeds the number of simultaneous
+         leases, and nothing enforces that - DEFAULT_MAX_CONNECTIONS is 3, so three concurrent
+         leases are enough to reach it.
+         Reservation state is guarded, but that only makes it readable - it does not make the
+         lease safe on its own. Selection reads it from sessionWithMinQueue, which runs wherever
+         IMAPOperation::start was called, so an acquire racing a start can hand the same
+         connection to both: the start sees it free, the acquire reserves it, and the operation
+         is already queued. Serialize acquireConnection and releaseConnection with every
+         start() on this session, on a queue of your choosing. */
+        virtual IMAPAsyncConnection * acquireConnection(String * folder);
+        /*! Returns a reserved connection to the shared pool and re-arms its idle
+         auto-disconnect. leaseGeneration is what the connection reported right after
+         acquireConnection handed it out; a release carrying an older value is refused, because
+         the connection has been released and leased again since, and going through would clear
+         the new holder's reservation. With disconnect, tears the socket down first (the
+         connection object stays pooled and reconnects on next use) - for servers that pin a
+         mailbox snapshot per connection. Idempotent: releasing a connection that is not reserved
+         does nothing. Same threading contract as acquireConnection. */
+        virtual void releaseConnection(IMAPAsyncConnection * connection, unsigned int leaseGeneration, bool disconnect);
         
         virtual void setConnectionLogger(ConnectionLogger * logger);
         virtual ConnectionLogger * connectionLogger();
@@ -211,6 +251,7 @@ namespace mailcore {
         time_t mTimeout;
         bool mAllowsFolderConcurrentAccessEnabled;
         unsigned int mMaximumConnections;
+        time_t mAutomaticDisconnectDelay;
         ConnectionLogger * mConnectionLogger;
         bool mAutomaticConfigurationDone;
         IMAPIdentity * mServerIdentity;
@@ -233,6 +274,11 @@ namespace mailcore {
          predicate ( lastFolder() EQUALS TO @param folder ). In case of param folder is NULL
          the function would search a session among non-selected ones. */
         virtual IMAPAsyncConnection * sessionWithMinQueue(bool filterByFolder, String * folder);
+        // The same pick, allowed to consider connections a lease has reserved - for the fallback
+        // in availableSession, and nothing else. Reserved connections are skipped otherwise. An
+        // overload rather than a default argument on the declaration above, so that declaration
+        // and any override of it stay as they are.
+        virtual IMAPAsyncConnection * sessionWithMinQueue(bool filterByFolder, String * folder, bool includeReserved);
         /*! Returns existant or new session with empty operation queue, if it can.
          Otherwise, returns the session with the minimum size of the operation queue. */
         virtual IMAPAsyncConnection * availableSession();

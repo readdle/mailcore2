@@ -47,6 +47,18 @@ public class MCOIMAPBaseOperation : MCOOperation {
             baseOperation.interruptCurrentCommand()
         }
     }
+
+    /**
+     Pins this operation to the given connection: start() runs it there instead of letting the
+     session pick a connection. Set it before start(); pair with
+     MCOIMAPSession.acquireConnection(folder:), which is what keeps other operations off that
+     connection.
+     */
+    public func setConnection(_ connection: MCOIMAPAsyncConnection) {
+        mailCoreAutoreleasePool {
+            baseOperation.setSession(connection.connection)
+        }
+    }
     
     public func itemProgress(current: UInt32, maximum: UInt32) {
         

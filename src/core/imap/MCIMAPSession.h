@@ -238,6 +238,12 @@ namespace mailcore {
         virtual void connectIfNeeded(ErrorCode * pError);
         virtual void selectIfNeeded(String * folder, ErrorCode * pError);
         virtual bool isDisconnected();
+
+        // Wall-clock moment (seconds since the epoch, sub-second resolution) of the last
+        // successful LOGIN on this session, 0 when it has never logged in. A client that has to
+        // know whether a pooled connection's mailbox view predates some event of its own
+        // compares against this instead of tracking disconnects it cannot observe.
+        virtual double lastLoginTime();
         virtual bool isAutomaticConfigurationDone();
         virtual void resetAutomaticConfigurationDone();
         virtual void applyCapabilities(IndexSet * capabilities);
@@ -293,6 +299,7 @@ namespace mailcore {
         String * mCurrentFolder;
 		MCB_LOCK_TYPE mIdleLock;
         int mState;
+        double mLastLoginTime;
         mailimap * mImap;
         IMAPProgressCallback * mProgressCallback;
         unsigned int mProgressItemsCount;
