@@ -668,6 +668,45 @@ final class IMAPConnectionLeaseTests: XCTestCase {
         }
     }
 
+    /// An interrupted connection is the case the state alone gets wrong: libetpan never clears a
+    /// cancelled stream, so the session stays "connected" while its next command has to tear that
+    /// stream down and build the connection again — strictly more than a closed socket costs. It
+    /// must lose the tie to a connection that can answer.
+    func testAcquirePrefersTheLiveConnectionOverAnInterruptedOne() throws {
+        let endpoint = try LeaseTestTCPEndpoint(greeting: Self.bannerOnlyGreeting)
+        defer { endpoint.stop() }
+
+        let session = makeSession(port: endpoint.port, maximumConnections: 2)
+        guard let pool = leaseTwoConnections(session) else {
+            return
+        }
+
+        runOffMainThread(timeout: 60) {
+            for connection in pool {
+                self.runConnect(session, on: connection)
+            }
+
+            // Nothing answers the NOOP, so interrupting it is what cancels the stream and leaves
+            // the connection pooled, connected, and owing a reconnect.
+            let noop = session.noopOperation()
+            noop.setConnection(pool[0])
+            let finished = self.start(noop)
+            XCTAssertEqual(finished.wait(timeout: .now() + 2), .timedOut,
+                           "The NOOP was expected to be blocked on the silent socket")
+            XCTAssertTrue(noop.interruptCurrentCommand())
+            XCTAssertEqual(finished.wait(timeout: .now() + 10), .success)
+            self.releaseAll(session, pool)
+
+            guard let acquired = session.acquireConnection(folder: nil) else {
+                return XCTFail("With both connections back in the pool a lease must be satisfied")
+            }
+            defer { session.releaseConnection(acquired, disconnect: false) }
+
+            XCTAssertEqual(acquired.identity, pool[1].identity,
+                           "A cancelled stream costs more than a closed socket, not less")
+        }
+    }
+
     /// Two live idle connections stay interchangeable, and the pick stays the first in the pool.
     func testTiesAmongLiveConnectionsKeepThePoolOrder() throws {
         let endpoint = try LeaseTestTCPEndpoint(greeting: Self.bannerOnlyGreeting)
