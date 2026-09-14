@@ -668,6 +668,51 @@ final class IMAPConnectionLeaseTests: XCTestCase {
         }
     }
 
+    /// A connection whose stream died under a command is the case the socket state alone gets
+    /// wrong: libetpan never clears a cancelled stream, so the session stays "connected" while its
+    /// next command has to tear that stream down and build the connection again — strictly more
+    /// than a closed socket costs. It must lose the tie to a connection that can answer.
+    func testAcquirePrefersTheLiveConnectionOverAnInterruptedOne() throws {
+        // LOGIN and what mailcore sends after it are answered, so the command the interrupt cuts is
+        // the NOOP itself - the connection is fully logged in when its stream dies, which is the
+        // state this is about.
+        let endpoint = try LeaseTestTCPEndpoint(greeting: Self.bannerOnlyGreeting,
+                                                answers: ["LOGIN": "",
+                                                          "CAPABILITY": "* CAPABILITY IMAP4rev1\r\n",
+                                                          "LIST": "* LIST (\\Noselect) \"/\" \"\"\r\n"])
+        defer { endpoint.stop() }
+
+        let session = makeSession(port: endpoint.port, maximumConnections: 2)
+        guard let pool = leaseTwoConnections(session) else {
+            return
+        }
+
+        runOffMainThread(timeout: 60) {
+            for connection in pool {
+                self.runConnect(session, on: connection)
+            }
+
+            // Nothing answers the NOOP, so interrupting it is what cancels the stream and leaves
+            // the connection pooled, connected, and owing a reconnect.
+            let noop = session.noopOperation()
+            noop.setConnection(pool[0])
+            let finished = self.start(noop)
+            XCTAssertEqual(finished.wait(timeout: .now() + 2), .timedOut,
+                           "The NOOP was expected to be blocked on the silent socket")
+            XCTAssertTrue(noop.interruptCurrentCommand())
+            XCTAssertEqual(finished.wait(timeout: .now() + 10), .success)
+            self.releaseAll(session, pool)
+
+            guard let acquired = session.acquireConnection(folder: nil) else {
+                return XCTFail("With both connections back in the pool a lease must be satisfied")
+            }
+            defer { session.releaseConnection(acquired, disconnect: false) }
+
+            XCTAssertEqual(acquired.identity, pool[1].identity,
+                           "A cancelled stream costs more than a closed socket, not less")
+        }
+    }
+
     /// Two live idle connections stay interchangeable, and the pick stays the first in the pool.
     func testTiesAmongLiveConnectionsKeepThePoolOrder() throws {
         let endpoint = try LeaseTestTCPEndpoint(greeting: Self.bannerOnlyGreeting)

@@ -1081,6 +1081,8 @@ void IMAPSession::login(ErrorCode * pError)
             
             r = mailimap_list(mImap, "", "", &imap_folders);
             folders = resultsWithError(r, imap_folders, pError);
+            if (* pError == ErrorConnection || * pError == ErrorParse)
+                mShouldDisconnect = true;
             if (* pError != ErrorNone)
                 return;
             
@@ -1380,6 +1382,11 @@ void IMAPSession::noop(ErrorCode * pError)
         r = mailimap_noop(mImap);
         if (r == MAILIMAP_ERROR_STREAM) {
             * pError = ErrorConnection;
+            mShouldDisconnect = true;
+        }
+        if (r == MAILIMAP_ERROR_PARSE) {
+            * pError = ErrorParse;
+            mShouldDisconnect = true;
         }
         if (r == MAILIMAP_ERROR_NOOP) {
             * pError = ErrorNoop;
@@ -4418,6 +4425,11 @@ bool IMAPSession::allowsNewPermanentFlags() {
 bool IMAPSession::isDisconnected()
 {
     return mState == STATE_DISCONNECTED;
+}
+
+bool IMAPSession::needsReconnect()
+{
+    return mState == STATE_DISCONNECTED || mShouldDisconnect;
 }
 
 double IMAPSession::lastLoginTime()
