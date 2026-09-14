@@ -291,6 +291,11 @@ double IMAPAsyncConnection::lastLoginTime()
     return mSession->lastLoginTime();
 }
 
+bool IMAPAsyncConnection::isDisconnected()
+{
+    return mSession->isDisconnected();
+}
+
 unsigned int IMAPAsyncConnection::operationsCount()
 {
     return mQueue->count();
