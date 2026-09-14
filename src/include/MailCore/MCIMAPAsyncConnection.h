@@ -168,6 +168,13 @@ namespace mailcore {
         
         virtual bool isQueueRunning();
         virtual void setQueueRunning(bool running);
+
+        // Whether this connection's IMAP session was torn down or never established, so that its
+        // next command connects and logs in first (a connection whose stream failed still reports
+        // connected until the next command notices). Declared last on purpose: this class is
+        // exported, and a virtual inserted among the existing ones would shift every vtable slot
+        // after it.
+        virtual bool isDisconnected();
     };
     
 }
