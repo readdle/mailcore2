@@ -521,6 +521,245 @@ final class IMAPConnectionLeaseTests: XCTestCase {
             session.releaseConnection(leased, disconnect: false)
         }
     }
+
+    // MARK: - Liveness of the chosen connection
+
+    /// Lets a CONNECT finish - capabilities inline, so no CAPABILITY follow-up - and answers
+    /// nothing else, so a connected connection stays idle and any command pinned to it blocks.
+    private static let bannerOnlyGreeting = "* OK [CAPABILITY IMAP4rev1] LeaseTestTCPEndpoint ready\r\n"
+
+    /// Two pooled connections in a known order: taking the second lease while the first is held
+    /// is what makes the pool grow to two, and it fixes which one comes first.
+    private func leaseTwoConnections(_ session: MCOIMAPSession,
+                                     folder: String? = nil) -> [MCOIMAPAsyncConnection]? {
+        guard let first = session.acquireConnection(folder: folder),
+              let second = session.acquireConnection(folder: folder) else {
+            XCTFail("A pool with room for 2 connections must satisfy both leases")
+            return nil
+        }
+        return [first, second]
+    }
+
+    private func releaseAll(_ session: MCOIMAPSession, _ connections: [MCOIMAPAsyncConnection]) {
+        for connection in connections {
+            session.releaseConnection(connection, disconnect: false)
+        }
+    }
+
+    private func runConnect(_ session: MCOIMAPSession, on connection: MCOIMAPAsyncConnection) {
+        let operation = session.connectOperation()
+        operation.setConnection(connection)
+        XCTAssertEqual(start(operation).wait(timeout: .now() + 5), .success,
+                       "The greeting endpoint was expected to let the connect finish")
+    }
+
+    /// Stands in for the socket the pool drops after its idle delay, minus the waiting: the
+    /// operation reports back once the teardown is done, so the state read afterwards is settled.
+    private func tearDownSocket(of connection: MCOIMAPAsyncConnection) {
+        XCTAssertEqual(start(connection.disconnectOperation()).wait(timeout: .now() + 5), .success,
+                       "The connection-scoped disconnect was expected to finish")
+    }
+
+    /// Two free idle connections, one of them disconnected: their queues say the same thing, so
+    /// without the preference the pick is position in the pool and the first, most urgent asker
+    /// pays for a handshake half the time. Run for either position and for both acquireConnection
+    /// paths; only the dead-comes-first variants can fail without it, the others hold the
+    /// established order in place.
+    private func assertLeasePrefersTheLiveConnection(deadIndex: Int, folder: String?) throws {
+        let endpoint = try LeaseTestTCPEndpoint(greeting: Self.bannerOnlyGreeting)
+        defer { endpoint.stop() }
+
+        let session = makeSession(port: endpoint.port, maximumConnections: 2)
+        guard let pool = leaseTwoConnections(session, folder: folder) else {
+            return
+        }
+
+        runOffMainThread(timeout: 60) {
+            for connection in pool {
+                self.runConnect(session, on: connection)
+            }
+            self.tearDownSocket(of: pool[deadIndex])
+            self.releaseAll(session, pool)
+
+            guard let acquired = session.acquireConnection(folder: folder) else {
+                return XCTFail("With both connections back in the pool a lease must be satisfied")
+            }
+            defer { session.releaseConnection(acquired, disconnect: false) }
+
+            XCTAssertEqual(acquired.identity, pool[1 - deadIndex].identity,
+                           "The lease must go to the connected connection, not to the one that owes a handshake")
+        }
+    }
+
+    func testAcquirePrefersTheLiveConnectionOverAnEarlierDeadOne() throws {
+        try assertLeasePrefersTheLiveConnection(deadIndex: 0, folder: nil)
+    }
+
+    func testAcquirePrefersTheLiveConnectionOverALaterDeadOne() throws {
+        try assertLeasePrefersTheLiveConnection(deadIndex: 1, folder: nil)
+    }
+
+    /// Folder affinity outlives the socket - nothing clears the last selected folder on a
+    /// disconnect - so the folder-matched branch chooses between the same two connections.
+    func testAcquireForAFolderPrefersTheLiveConnection() throws {
+        try assertLeasePrefersTheLiveConnection(deadIndex: 0, folder: "INBOX")
+    }
+
+    /// A connection that has never been used owes the same handshake as one that idled out.
+    func testAcquirePrefersAWarmConnectionOverANeverConnectedOne() throws {
+        let endpoint = try LeaseTestTCPEndpoint(greeting: Self.bannerOnlyGreeting)
+        defer { endpoint.stop() }
+
+        let session = makeSession(port: endpoint.port, maximumConnections: 2)
+        guard let pool = leaseTwoConnections(session) else {
+            return
+        }
+
+        runOffMainThread(timeout: 60) {
+            self.runConnect(session, on: pool[1])
+            self.releaseAll(session, pool)
+
+            guard let acquired = session.acquireConnection(folder: nil) else {
+                return XCTFail("With both connections back in the pool a lease must be satisfied")
+            }
+            defer { session.releaseConnection(acquired, disconnect: false) }
+
+            XCTAssertEqual(acquired.identity, pool[1].identity,
+                           "A connection that never reached the wire is not the ready one")
+        }
+    }
+
+    /// The preference is the tie and nothing more: a shorter queue wins outright, even when the
+    /// shorter queue is the disconnected one. Queue length counts commands without weighing them,
+    /// and a lease is owed an empty queue.
+    func testShorterQueueWinsEvenWhenItIsTheDeadConnection() throws {
+        let endpoint = try LeaseTestTCPEndpoint(greeting: Self.bannerOnlyGreeting)
+        defer { endpoint.stop() }
+
+        let session = makeSession(port: endpoint.port, maximumConnections: 2)
+        guard let pool = leaseTwoConnections(session) else {
+            return
+        }
+
+        runOffMainThread(timeout: 60) {
+            for connection in pool {
+                self.runConnect(session, on: connection)
+            }
+            self.tearDownSocket(of: pool[0])
+
+            // The endpoint answers nothing past the banner, so this command stays in the queue.
+            let noop = session.noopOperation()
+            noop.setConnection(pool[1])
+            let finished = self.start(noop)
+            XCTAssertTrue(self.waitForOperationsCount(of: pool[1], toReach: 1))
+            self.releaseAll(session, pool)
+
+            guard let acquired = session.acquireConnection(folder: nil) else {
+                return XCTFail("With both connections back in the pool a lease must be satisfied")
+            }
+            XCTAssertEqual(acquired.identity, pool[0].identity,
+                           "An empty queue wins the lease even when it costs a handshake to use")
+            session.releaseConnection(acquired, disconnect: false)
+
+            XCTAssertEqual(finished.wait(timeout: .now() + 2), .timedOut,
+                           "The NOOP was expected to be blocked on the silent socket")
+            XCTAssertTrue(noop.interruptCurrentCommand())
+            XCTAssertEqual(finished.wait(timeout: .now() + 10), .success)
+        }
+    }
+
+    /// Two live idle connections stay interchangeable, and the pick stays the first in the pool.
+    func testTiesAmongLiveConnectionsKeepThePoolOrder() throws {
+        let endpoint = try LeaseTestTCPEndpoint(greeting: Self.bannerOnlyGreeting)
+        defer { endpoint.stop() }
+
+        let session = makeSession(port: endpoint.port, maximumConnections: 2)
+        guard let pool = leaseTwoConnections(session) else {
+            return
+        }
+
+        runOffMainThread(timeout: 60) {
+            for connection in pool {
+                self.runConnect(session, on: connection)
+            }
+            self.releaseAll(session, pool)
+
+            guard let acquired = session.acquireConnection(folder: nil) else {
+                return XCTFail("With both connections back in the pool a lease must be satisfied")
+            }
+            defer { session.releaseConnection(acquired, disconnect: false) }
+
+            XCTAssertEqual(acquired.identity, pool[0].identity,
+                           "With nothing to tell two idle live connections apart the first stays the pick")
+        }
+    }
+
+    /// Leases are not the only caller: a regular operation goes through the same selection.
+    func testUnpinnedOperationRunsOnTheLiveConnection() throws {
+        let endpoint = try LeaseTestTCPEndpoint(greeting: Self.bannerOnlyGreeting)
+        defer { endpoint.stop() }
+
+        let session = makeSession(port: endpoint.port, maximumConnections: 2)
+        guard let pool = leaseTwoConnections(session) else {
+            return
+        }
+
+        runOffMainThread(timeout: 60) {
+            for connection in pool {
+                self.runConnect(session, on: connection)
+            }
+            self.tearDownSocket(of: pool[0])
+            self.releaseAll(session, pool)
+
+            let noop = session.noopOperation()
+            let finished = self.start(noop)
+
+            XCTAssertTrue(self.waitForOperationsCount(of: pool[1], toReach: 1),
+                          "A regular operation must land on the connection that can answer it right away")
+            XCTAssertEqual(pool[0].operationsCount, 0,
+                           "The disconnected connection must be left alone while a live one is free")
+
+            XCTAssertEqual(finished.wait(timeout: .now() + 2), .timedOut,
+                           "The NOOP was expected to be blocked on the silent socket")
+            XCTAssertTrue(noop.interruptCurrentCommand())
+            XCTAssertEqual(finished.wait(timeout: .now() + 10), .success)
+        }
+    }
+
+    /// The all-reserved fallback shares a leased connection with regular operations, through the
+    /// same pick: it too must hand over the one that can answer now.
+    func testExhaustedPoolSharesTheLiveConnection() throws {
+        let endpoint = try LeaseTestTCPEndpoint(greeting: Self.bannerOnlyGreeting)
+        defer { endpoint.stop() }
+
+        let session = makeSession(port: endpoint.port, maximumConnections: 2)
+        guard let pool = leaseTwoConnections(session) else {
+            return
+        }
+
+        runOffMainThread(timeout: 60) {
+            for connection in pool {
+                self.runConnect(session, on: connection)
+            }
+            self.tearDownSocket(of: pool[0])
+
+            // Both stay leased: with the pool at its limit a regular operation has nothing else.
+            let noop = session.noopOperation()
+            let finished = self.start(noop)
+
+            XCTAssertTrue(self.waitForOperationsCount(of: pool[1], toReach: 1),
+                          "The shared connection must be the live one")
+            XCTAssertEqual(pool[0].operationsCount, 0,
+                           "Sharing must not revive a disconnected connection while a live one is there")
+
+            XCTAssertEqual(finished.wait(timeout: .now() + 2), .timedOut,
+                           "The NOOP was expected to be blocked on the silent socket")
+            XCTAssertTrue(noop.interruptCurrentCommand())
+            XCTAssertEqual(finished.wait(timeout: .now() + 10), .success)
+
+            self.releaseAll(session, pool)
+        }
+    }
 }
 
 #endif
