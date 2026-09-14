@@ -8,6 +8,8 @@
 
 #ifdef __cplusplus
 
+#include <atomic>
+
 typedef struct mailimap_fetch_type mailimap_fetch_type;
 
 namespace mailcore {
@@ -298,7 +300,9 @@ namespace mailcore {
         unsigned int mLastFetchedSequenceNumber;
         String * mCurrentFolder;
 		MCB_LOCK_TYPE mIdleLock;
-        int mState;
+        // Written on this session's own thread, read by IMAPAsyncSession's connection
+        // selection through IMAPAsyncConnection::isDisconnected: atomic so that read is defined.
+        std::atomic<int> mState;
         double mLastLoginTime;
         mailimap * mImap;
         IMAPProgressCallback * mProgressCallback;
