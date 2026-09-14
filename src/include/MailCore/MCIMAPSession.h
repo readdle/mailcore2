@@ -305,8 +305,8 @@ namespace mailcore {
         unsigned int mLastFetchedSequenceNumber;
         String * mCurrentFolder;
 		MCB_LOCK_TYPE mIdleLock;
-        // Written on this session's own thread, read by IMAPAsyncSession's connection
-        // selection through IMAPAsyncConnection::isDisconnected: atomic so that read is defined.
+        // Written on this session's own thread, read by IMAPAsyncSession's connection selection
+        // through IMAPAsyncConnection::needsReconnect: atomic so that read is defined.
         std::atomic<int> mState;
         double mLastLoginTime;
         mailimap * mImap;
@@ -316,6 +316,7 @@ namespace mailcore {
 		MCB_LOCK_TYPE mConnectionLoggerLock;
         bool mAutomaticConfigurationEnabled;
         bool mAutomaticConfigurationDone;
+        // Read cross-thread with mState, and for the same reason: see above.
         std::atomic<bool> mShouldDisconnect;
         
         String * mLoginResponse;

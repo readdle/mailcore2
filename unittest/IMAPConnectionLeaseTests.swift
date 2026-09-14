@@ -668,12 +668,18 @@ final class IMAPConnectionLeaseTests: XCTestCase {
         }
     }
 
-    /// An interrupted connection is the case the state alone gets wrong: libetpan never clears a
-    /// cancelled stream, so the session stays "connected" while its next command has to tear that
-    /// stream down and build the connection again — strictly more than a closed socket costs. It
-    /// must lose the tie to a connection that can answer.
+    /// A connection whose stream died under a command is the case the socket state alone gets
+    /// wrong: libetpan never clears a cancelled stream, so the session stays "connected" while its
+    /// next command has to tear that stream down and build the connection again — strictly more
+    /// than a closed socket costs. It must lose the tie to a connection that can answer.
     func testAcquirePrefersTheLiveConnectionOverAnInterruptedOne() throws {
-        let endpoint = try LeaseTestTCPEndpoint(greeting: Self.bannerOnlyGreeting)
+        // LOGIN and what mailcore sends after it are answered, so the command the interrupt cuts is
+        // the NOOP itself - the connection is fully logged in when its stream dies, which is the
+        // state this is about.
+        let endpoint = try LeaseTestTCPEndpoint(greeting: Self.bannerOnlyGreeting,
+                                                answers: ["LOGIN": "",
+                                                          "CAPABILITY": "* CAPABILITY IMAP4rev1\r\n",
+                                                          "LIST": "* LIST (\\Noselect) \"/\" \"\"\r\n"])
         defer { endpoint.stop() }
 
         let session = makeSession(port: endpoint.port, maximumConnections: 2)
