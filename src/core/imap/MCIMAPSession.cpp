@@ -1384,6 +1384,10 @@ void IMAPSession::noop(ErrorCode * pError)
             * pError = ErrorConnection;
             mShouldDisconnect = true;
         }
+        if (r == MAILIMAP_ERROR_PARSE) {
+            * pError = ErrorParse;
+            mShouldDisconnect = true;
+        }
         if (r == MAILIMAP_ERROR_NOOP) {
             * pError = ErrorNoop;
         }
