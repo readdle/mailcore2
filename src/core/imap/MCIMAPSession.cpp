@@ -4420,6 +4420,11 @@ bool IMAPSession::isDisconnected()
     return mState == STATE_DISCONNECTED;
 }
 
+bool IMAPSession::needsReconnect()
+{
+    return mState == STATE_DISCONNECTED || mShouldDisconnect;
+}
+
 double IMAPSession::lastLoginTime()
 {
     LOCK();

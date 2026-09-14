@@ -411,15 +411,15 @@ IMAPAsyncConnection * IMAPAsyncSession::sessionWithMinQueue(bool filterByFolder,
 {
     IMAPAsyncConnection * chosenSession = NULL;
     unsigned int minOperationsCount = 0;
-    bool chosenSessionConnected = false;
+    bool chosenSessionReady = false;
 
     for (unsigned int i = 0 ; i < mSessions->count() ; i ++) {
         IMAPAsyncConnection * s = (IMAPAsyncConnection *) mSessions->objectAtIndex(i);
         // an equally free session that owes a handshake loses to one that does not
         unsigned int operationsCount = s->operationsCount();
-        bool connected = !s->isDisconnected();
+        bool ready = !s->needsReconnect();
         if ((chosenSession == NULL) || (operationsCount < minOperationsCount)
-            || ((operationsCount == minOperationsCount) && connected && !chosenSessionConnected)) {
+            || ((operationsCount == minOperationsCount) && ready && !chosenSessionReady)) {
             bool matched = includeReserved || !s->isReserved();
             if (matched && filterByFolder) {
                 // filter by last selested folder
@@ -429,7 +429,7 @@ IMAPAsyncConnection * IMAPAsyncSession::sessionWithMinQueue(bool filterByFolder,
             if (matched) {
                 chosenSession = s;
                 minOperationsCount = operationsCount;
-                chosenSessionConnected = connected;
+                chosenSessionReady = ready;
             }
         }
     }

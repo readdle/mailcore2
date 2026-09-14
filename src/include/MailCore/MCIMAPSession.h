@@ -241,6 +241,11 @@ namespace mailcore {
         virtual void selectIfNeeded(String * folder, ErrorCode * pError);
         virtual bool isDisconnected();
 
+        // Whether the next command on this session has to build the connection again - the socket
+        // is gone, or a failed command left a stream that connectIfNeeded tears down first. Unlike
+        // isDisconnected(), which answers only for the socket and is what the idle timer asks.
+        virtual bool needsReconnect();
+
         // Wall-clock moment (seconds since the epoch, sub-second resolution) of the last
         // successful LOGIN on this session, 0 when it has never logged in. A client that has to
         // know whether a pooled connection's mailbox view predates some event of its own
@@ -311,7 +316,7 @@ namespace mailcore {
 		MCB_LOCK_TYPE mConnectionLoggerLock;
         bool mAutomaticConfigurationEnabled;
         bool mAutomaticConfigurationDone;
-        bool mShouldDisconnect;
+        std::atomic<bool> mShouldDisconnect;
         
         String * mLoginResponse;
         String * mGmailUserDisplayName;
