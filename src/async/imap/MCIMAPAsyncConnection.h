@@ -177,6 +177,10 @@ namespace mailcore {
         // Makes the next command on this connection rebuild it first; same contract as
         // IMAPSession::scheduleReconnect(). Declared last, like needsReconnect().
         virtual void scheduleReconnect();
+        // Cuts this connection's stream whatever is running on it - IMAPSession::interruptCurrentCommand()
+        // without the queue's check that an operation is running. For tests, which need a cut that
+        // lands with nothing on the wire. Declared last, like needsReconnect().
+        virtual void cancelStream();
     };
     
 }

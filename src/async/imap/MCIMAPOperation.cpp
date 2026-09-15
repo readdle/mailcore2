@@ -174,6 +174,12 @@ void IMAPOperation::itemsProgressOnMainThread(void * ctx)
 
 void IMAPOperation::beforeMain()
 {
+    // Runs before main() while the connection's queue thread waits for it, so no command of this
+    // connection is on the wire: the one place a stream cut by interruptCurrentCommand() can be
+    // turned into a reconnect without landing inside another operation's command sequence.
+    if (mSession != NULL) {
+        mSession->session()->scheduleReconnectIfInterrupted();
+    }
 }
 
 bool IMAPOperation::interruptCurrentCommand()

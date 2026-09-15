@@ -265,6 +265,10 @@ namespace mailcore {
         // connectIfNeeded() inside that operation - login() then fails with ErrorConnection.
         // Declared last, for the same reason as needsReconnect().
         virtual void scheduleReconnect();
+        // Turns a stream cut by interruptCurrentCommand() into a pending reconnect. For the moment
+        // between two operations, when no command is on the wire: a cut that landed with no read
+        // in flight failed nothing, and this is where it gets its reconnect. Declared last.
+        virtual void scheduleReconnectIfInterrupted();
 
     private:
         String * mHostname;
@@ -326,6 +330,9 @@ namespace mailcore {
         bool mAutomaticConfigurationDone;
         // Read cross-thread with mState, and for the same reason: see above.
         std::atomic<bool> mShouldDisconnect;
+        // The stream was cancelled by interruptCurrentCommand() and nothing has rebuilt it yet.
+        // Written by the interrupting thread, read cross-thread like mShouldDisconnect.
+        std::atomic<bool> mStreamCancelled;
         
         String * mLoginResponse;
         String * mGmailUserDisplayName;

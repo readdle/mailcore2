@@ -62,6 +62,13 @@ public class MCOIMAPAsyncConnection: NSObjectCompat {
         connection.scheduleReconnect()
     }
 
+    /// Cuts this connection's stream whatever is running on it. For tests: a cut on an idle
+    /// connection, which MCOIMAPBaseOperation.interruptCurrentCommand() cannot produce - it acts
+    /// only while its operation is running.
+    internal func cancelStream() {
+        connection.cancelStream()
+    }
+
     internal var isReserved: Bool {
         return connection.isReserved
     }
