@@ -260,6 +260,11 @@ namespace mailcore {
         // Declared last: this class is exported, and a virtual inserted among the existing ones
         // would shift every vtable slot after it.
         virtual bool needsReconnect();
+        // Makes the next command rebuild the connection first, as a failed command would have.
+        // Any thread, but between operations only: raised while one runs, it is met by the next
+        // connectIfNeeded() inside that operation - login() then fails with ErrorConnection.
+        // Declared last, for the same reason as needsReconnect().
+        virtual void scheduleReconnect();
 
     private:
         String * mHostname;
@@ -309,6 +314,7 @@ namespace mailcore {
 		MCB_LOCK_TYPE mIdleLock;
         // Written on this session's own thread, read by IMAPAsyncSession's connection selection
         // through IMAPAsyncConnection::needsReconnect: atomic so that read is defined.
+        // mShouldDisconnect has one more writer, scheduleReconnect(), on any thread.
         std::atomic<int> mState;
         double mLastLoginTime;
         mailimap * mImap;

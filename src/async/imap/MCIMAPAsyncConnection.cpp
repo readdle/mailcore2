@@ -277,6 +277,10 @@ IMAPOperation * IMAPAsyncConnection::disconnectOperation()
 {
     IMAPDisconnectOperation * op = new IMAPDisconnectOperation();
     op->setSession(this);
+    // Retains the owner like every operation the owner creates: this connection reaches it through
+    // a raw pointer on each queue start and stop, and the queue's own retain is released before
+    // a queued operation restarts it.
+    op->setMainSession(mOwner);
     op->autorelease();
     return op;
 }
@@ -294,6 +298,11 @@ double IMAPAsyncConnection::lastLoginTime()
 bool IMAPAsyncConnection::needsReconnect()
 {
     return mSession->needsReconnect();
+}
+
+void IMAPAsyncConnection::scheduleReconnect()
+{
+    mSession->scheduleReconnect();
 }
 
 unsigned int IMAPAsyncConnection::operationsCount()

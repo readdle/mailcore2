@@ -1,3 +1,4 @@
+import Dispatch
 import Foundation
 import CMailCore
 
@@ -38,12 +39,27 @@ public class MCOIMAPAsyncConnection: NSObjectCompat {
     /// Returns the lease if its holder never did. A leaked lease is permanent otherwise — nothing
     /// in the pool clears a reservation on its own — and the connection would be lost to the pool
     /// for the life of the session. Torn down rather than pooled: a holder that lost track of its
-    /// lease cannot have left the connection in a state anybody should inherit. Best effort:
-    /// deinit runs on whatever thread drops the last reference, outside the serialisation the
-    /// release contract asks for; a holder that releases explicitly never gets here.
+    /// lease cannot have left the connection in a state anybody should inherit. deinit runs on
+    /// whatever thread drops the last reference, so the release hops to the session's queue: a
+    /// release starts the teardown operation, and every operation start on a session must come
+    /// from that queue (see MCOIMAPSession.acquireConnection). The lease is therefore back in the
+    /// pool only once that queue has run, not the instant the handle dies. A holder that releases
+    /// explicitly never gets here.
     deinit {
-        session.releaseConnection(self, disconnect: true)
-        connection.release()
+        let session = self.session
+        let connection = self.connection
+        let leaseGeneration = self.leaseGeneration
+        (session.dispatchQueue ?? DispatchQueue.main).async {
+            session.releaseConnection(connection, leaseGeneration: leaseGeneration, disconnect: true)
+            connection.release()
+        }
+    }
+
+    /// Makes the next command on this connection rebuild it first, the way a failed command would
+    /// have. For tests: raises the flag from outside the connection's thread without cutting the
+    /// stream, so a command in flight completes and the flag is met by the next one.
+    internal func scheduleReconnect() {
+        connection.scheduleReconnect()
     }
 
     internal var isReserved: Bool {

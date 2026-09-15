@@ -26,6 +26,7 @@ final class LeaseTestTCPEndpoint {
     private let listeningSocket: Int32
     private let greeting: String?
     private let answers: [String: String]
+    private let beforeAnswering: [String: () -> Void]
     private let acceptQueue = DispatchQueue(label: "LeaseTestTCPEndpoint.accept")
     private let lock = NSLock()
     private var acceptedSockets: [Int32] = []
@@ -38,10 +39,14 @@ final class LeaseTestTCPEndpoint {
     /// Pass an IMAP banner (e.g. "* OK [CAPABILITY IMAP4rev1] ready\r\n") to let connects finish;
     /// pass nil to stay silent so that every command blocks. `answers` maps a command name
     /// (LOGIN, LIST, ...) to the untagged lines to send before its tagged OK, so a test can walk
-    /// the client to a chosen state; any command not listed still blocks.
-    init(greeting: String? = nil, answers: [String: String] = [:]) throws {
+    /// the client to a chosen state; any command not listed still blocks. `beforeAnswering` runs
+    /// a block once a listed command has arrived and before it is answered - while the client is
+    /// blocked in that command's read, which is the one moment a test can act on it from another
+    /// thread with a known position in the client's command sequence.
+    init(greeting: String? = nil, answers: [String: String] = [:], beforeAnswering: [String: () -> Void] = [:]) throws {
         self.greeting = greeting
         self.answers = answers
+        self.beforeAnswering = beforeAnswering
 
         // Everything below works on a local descriptor: a closure that touched `listeningSocket`
         // would capture self before `port` is initialized.
@@ -131,6 +136,7 @@ final class LeaseTestTCPEndpoint {
             // descriptor; stop() only shuts the socket down, which wakes recv(), and the close
             // happens here.
             let answers = self.answers
+            let beforeAnswering = self.beforeAnswering
             DispatchQueue.global().async { [weak self] in
                 var buffer = [UInt8](repeating: 0, count: 1024)
                 var pending = ""
@@ -150,6 +156,7 @@ final class LeaseTestTCPEndpoint {
                         guard words.count >= 2, let untagged = answers[words[1].uppercased()] else {
                             continue
                         }
+                        beforeAnswering[words[1].uppercased()]?()
                         let reply = Array((untagged + "\(words[0]) OK \(words[1]) completed\r\n").utf8)
                         _ = reply.withUnsafeBufferPointer { send(accepted, $0.baseAddress!, $0.count, 0) }
                     }

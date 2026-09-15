@@ -174,6 +174,9 @@ namespace mailcore {
         // (see IMAPSession::needsReconnect). Declared last on purpose: this class is exported, and
         // a virtual inserted among the existing ones would shift every vtable slot after it.
         virtual bool needsReconnect();
+        // Makes the next command on this connection rebuild it first; same contract as
+        // IMAPSession::scheduleReconnect(). Declared last, like needsReconnect().
+        virtual void scheduleReconnect();
     };
     
 }
