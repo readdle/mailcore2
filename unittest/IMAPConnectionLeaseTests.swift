@@ -180,6 +180,53 @@ final class IMAPConnectionLeaseTests: XCTestCase {
         }
     }
 
+    func testCutWithNothingOnTheWireReconnectsBeforeTheNextOperation() throws {
+        // Every command is answered, so the NOOPs complete and the cut below meets no read in
+        // flight - the case an interrupt of a running command cannot produce.
+        let endpoint = try LeaseTestTCPEndpoint(greeting: "* OK [CAPABILITY IMAP4rev1] LeaseTestTCPEndpoint ready\r\n",
+                                                answers: ["LOGIN": "",
+                                                          "CAPABILITY": "* CAPABILITY IMAP4rev1\r\n",
+                                                          "LIST": "* LIST (\\Noselect) \"/\" \"\"\r\n",
+                                                          "NOOP": ""])
+        defer { endpoint.stop() }
+
+        let session = makeSession(port: endpoint.port, maximumConnections: 1)
+
+        guard let leased = session.acquireConnection(folder: nil) else {
+            return XCTFail("An empty pool with room for 1 connection must satisfy the lease")
+        }
+
+        runOffMainThread(timeout: 30) {
+            // A NOOP on a never-connected connection is a no-op, so connect first.
+            let connect = session.connectOperation()
+            connect.setConnection(leased)
+            XCTAssertEqual(self.start(connect).wait(timeout: .now() + 5), .success)
+            let first = session.noopOperation()
+            first.setConnection(leased)
+            XCTAssertEqual(self.start(first).wait(timeout: .now() + 5), .success)
+            XCTAssertEqual(endpoint.acceptedClientCount, 1)
+
+            // Logged in and idle: nothing fails on this cut, so nothing raises the reconnect flag.
+            leased.cancelStream()
+
+            // The next operation must rebuild the connection first instead of paying its own
+            // first command to find out.
+            let second = session.noopOperation()
+            second.setConnection(leased)
+            var error: Error?
+            let finished = DispatchSemaphore(value: 0)
+            second.start { opError in
+                error = opError
+                finished.signal()
+            }
+            XCTAssertEqual(finished.wait(timeout: .now() + 5), .success)
+            XCTAssertNil(error, "The NOOP after a cut with nothing on the wire must not fail")
+            XCTAssertEqual(endpoint.acceptedClientCount, 2, "The cut connection was expected to reconnect before the NOOP")
+
+            session.releaseConnection(leased, disconnect: false)
+        }
+    }
+
     func testUnpinnedOperationAvoidsTheLeasedConnection() throws {
         let endpoint = try LeaseTestTCPEndpoint()
         defer { endpoint.stop() }

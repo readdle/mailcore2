@@ -26,6 +26,7 @@ extern "C" {
 
     C_SYNTHESIZE_FUNC_DEFINITION(CIMAPAsyncConnection, CIMAPBaseOperation, disconnectOperation)
     C_SYNTHESIZE_FUNC_DEFINITION(CIMAPAsyncConnection, void, scheduleReconnect)
+    C_SYNTHESIZE_FUNC_DEFINITION(CIMAPAsyncConnection, void, cancelStream)
 
 #ifdef __cplusplus
 }

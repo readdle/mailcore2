@@ -427,6 +427,7 @@ void IMAPSession::init()
     mAutomaticConfigurationEnabled = true;
     mAutomaticConfigurationDone = false;
     mShouldDisconnect = false;
+    mStreamCancelled = false;
     mLoginResponse = NULL;
     mGmailUserDisplayName = NULL;
     mUnparsedResponseData = NULL;
@@ -652,6 +653,7 @@ void IMAPSession::unsetup()
     imap = mImap;
     mImap = NULL;
     mIdleEnabled = false;
+    mStreamCancelled = false;
     UNLOCK();
     
     if (imap != NULL) {
@@ -1120,8 +1122,9 @@ void IMAPSession::login(ErrorCode * pError)
     // identity() starts with connectIfNeeded(): with mShouldDisconnect raised meanwhile it tears the
     // connection down and rebuilds it, and its result is ignored above. A rebuilt connection is not
     // logged in - and a rebuild that failed has no mImap at all - so this must not read as a
-    // successful login; nor may one whose ignored ID left the stream marked for teardown.
-    if (mState != STATE_LOGGEDIN || mShouldDisconnect) {
+    // successful login; nor may one whose ignored ID left the stream marked for teardown, or
+    // whose stream was cut between two of its commands.
+    if (mState != STATE_LOGGEDIN || mShouldDisconnect || mStreamCancelled) {
         * pError = ErrorConnection;
         return;
     }
@@ -3759,7 +3762,10 @@ void IMAPSession::interruptCurrentCommand()
         // Deliberately not raising mShouldDisconnect here: the command this cuts fails with a
         // stream error and raises it itself, at a point its caller checks. Raised from this thread
         // it can land between two commands of one login(), where the nested connectIfNeeded()
-        // would rebuild the connection under a caller that ignores the result.
+        // would rebuild the connection under a caller that ignores the result. Every cut is
+        // remembered in mStreamCancelled: one that met no read in flight failed no command, and
+        // gets its reconnect at the next operation boundary (scheduleReconnectIfInterrupted).
+        mStreamCancelled = true;
     }
     UNLOCK();
 }
@@ -4437,12 +4443,19 @@ bool IMAPSession::isDisconnected()
 
 bool IMAPSession::needsReconnect()
 {
-    return mState == STATE_DISCONNECTED || mShouldDisconnect;
+    return mState == STATE_DISCONNECTED || mShouldDisconnect || mStreamCancelled;
 }
 
 void IMAPSession::scheduleReconnect()
 {
     mShouldDisconnect = true;
+}
+
+void IMAPSession::scheduleReconnectIfInterrupted()
+{
+    if (mStreamCancelled) {
+        mShouldDisconnect = true;
+    }
 }
 
 double IMAPSession::lastLoginTime()
