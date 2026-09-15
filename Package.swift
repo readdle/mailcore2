@@ -265,7 +265,7 @@ var targets: [Target] = [
             "unittest.cpp",
             "unittest.mm"
         ],
-        sources: ["CertificateUtilsTests.swift", "IMAPConnectionLeaseTests.swift", "IMAPConnectionOwnerLifetimeTests.swift", "IMAPIdleCancellationTests.swift", "IMAPInterruptCurrentCommandTests.swift", "LeaseTestTCPEndpoint.swift", "LibetpanHelperTests.swift", "unittest.swift"],
+        sources: ["CertificateUtilsTests.swift", "IMAPConnectionLeaseTests.swift", "IMAPConnectionOwnerLifetimeTests.swift", "IMAPIdleCancellationTests.swift", "IMAPInterruptCurrentCommandTests.swift", "IMAPLoginTests.swift", "LeaseTestTCPEndpoint.swift", "LibetpanHelperTests.swift", "unittest.swift"],
         resources: [
             .copy("data")
         ]

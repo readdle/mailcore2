@@ -25,6 +25,7 @@ extern "C" {
     C_SYNTHESIZE_READONLY_PROPERTY_DEFINITION(CIMAPAsyncConnection, double, lastLoginTime)
 
     C_SYNTHESIZE_FUNC_DEFINITION(CIMAPAsyncConnection, CIMAPBaseOperation, disconnectOperation)
+    C_SYNTHESIZE_FUNC_DEFINITION(CIMAPAsyncConnection, void, scheduleReconnect)
 
 #ifdef __cplusplus
 }

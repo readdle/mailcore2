@@ -46,6 +46,13 @@ public class MCOIMAPAsyncConnection: NSObjectCompat {
         connection.release()
     }
 
+    /// Makes the next command on this connection rebuild it first, the way a failed command would
+    /// have. For tests: raises the flag from outside the connection's thread without cutting the
+    /// stream, so a command in flight completes and the flag is met by the next one.
+    internal func scheduleReconnect() {
+        connection.scheduleReconnect()
+    }
+
     internal var isReserved: Bool {
         return connection.isReserved
     }

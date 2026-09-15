@@ -1116,6 +1116,15 @@ void IMAPSession::login(ErrorCode * pError)
     else {
         // TODO: namespace should be shared with other sessions for non automatic namespace.
     }
+
+    // identity() starts with connectIfNeeded(): with mShouldDisconnect raised meanwhile it tears the
+    // connection down and rebuilds it, and its result is ignored above. A rebuilt connection is not
+    // logged in - and a rebuild that failed has no mImap at all - so this must not read as a
+    // successful login.
+    if (mState != STATE_LOGGEDIN) {
+        * pError = ErrorConnection;
+        return;
+    }
     
     mAutomaticConfigurationDone = true;
     
@@ -4429,6 +4438,11 @@ bool IMAPSession::isDisconnected()
 bool IMAPSession::needsReconnect()
 {
     return mState == STATE_DISCONNECTED || mShouldDisconnect;
+}
+
+void IMAPSession::scheduleReconnect()
+{
+    mShouldDisconnect = true;
 }
 
 double IMAPSession::lastLoginTime()

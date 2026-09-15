@@ -300,6 +300,11 @@ bool IMAPAsyncConnection::needsReconnect()
     return mSession->needsReconnect();
 }
 
+void IMAPAsyncConnection::scheduleReconnect()
+{
+    mSession->scheduleReconnect();
+}
+
 unsigned int IMAPAsyncConnection::operationsCount()
 {
     return mQueue->count();
