@@ -8,6 +8,7 @@
 
 #if canImport(Darwin)
 
+import Darwin
 import Dispatch
 import Foundation
 import XCTest
