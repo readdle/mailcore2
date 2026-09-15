@@ -3757,14 +3757,15 @@ void IMAPSession::interruptCurrentCommand()
     // cancel object's own mutex and writes one byte to a pipe, it never blocks.
     LOCK();
     if (mImap != NULL && mImap->imap_stream != NULL) {
-        mailstream_cancel(mImap->imap_stream);
         // Deliberately not raising mShouldDisconnect here: the command this cuts fails with a
         // stream error and raises it itself, at a point its caller checks. Raised from this thread
         // it can land between two commands of one login(), where the nested connectIfNeeded()
         // would rebuild the connection under a caller that ignores the result. Every cut is
-        // remembered in mStreamCancelled: one that met no read in flight failed no command, and
-        // gets its reconnect at the next operation boundary (scheduleReconnectIfInterrupted).
+        // remembered in mStreamCancelled instead - published before the cut, so no reader sees a
+        // cancelled stream without it: one that met no read in flight failed no command, and gets
+        // its reconnect at the next operation boundary (scheduleReconnectIfInterrupted).
         mStreamCancelled = true;
+        mailstream_cancel(mImap->imap_stream);
     }
     UNLOCK();
 }
