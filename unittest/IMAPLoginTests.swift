@@ -19,12 +19,20 @@ import CMailCore
 
 final class IMAPLoginTests: XCTestCase {
 
-    private final class ConnectionSlot: @unchecked Sendable {
+    private final class ConnectionSlot {
         private let lock = NSLock()
         private var value: MCOIMAPAsyncConnection?
         var connection: MCOIMAPAsyncConnection? {
-            get { lock.withLock { value } }
-            set { lock.withLock { value = newValue } }
+            get {
+                lock.lock()
+                defer { lock.unlock() }
+                return value
+            }
+            set {
+                lock.lock()
+                value = newValue
+                lock.unlock()
+            }
         }
     }
 
