@@ -34,9 +34,9 @@ public class MCOIMAPBaseOperation : MCOOperation {
      the one running.
 
      Unlike cancel(), which only raises a flag mailcore checks before starting an operation, this
-     reaches the command already in flight. It costs the connection: the stream stays cancelled and
-     is rebuilt on next use, so call it for a command being abandoned, never to hurry up one whose
-     result still matters.
+     reaches the command already in flight. It costs the connection: the cut command fails with a
+     connection error and the connection is rebuilt before the one after, so call it for a command
+     being abandoned, never to hurry up one whose result still matters.
 
      - Returns: whether this operation was the one the queue was running at that moment. That may
      include a command that finished just as the interrupt landed: its result is intact, but the

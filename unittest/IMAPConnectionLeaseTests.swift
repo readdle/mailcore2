@@ -136,8 +136,8 @@ final class IMAPConnectionLeaseTests: XCTestCase {
 
     func testInterruptedConnectionReconnectsOnItsNextCommand() throws {
         // LOGIN and what mailcore sends right after it (CAPABILITY, the delimiter LIST) are
-        // answered, so that the command the interrupt cuts is the NOOP itself: a stream error
-        // inside any of those already schedules a reconnect on its own, one inside NOOP does not.
+        // answered, so that the command the interrupt cuts is the NOOP itself - a plain command
+        // outside login(), whose stream error is what has to schedule the reconnect.
         let endpoint = try LeaseTestTCPEndpoint(greeting: "* OK [CAPABILITY IMAP4rev1] LeaseTestTCPEndpoint ready\r\n",
                                                 answers: ["LOGIN": "",
                                                           "CAPABILITY": "* CAPABILITY IMAP4rev1\r\n",
