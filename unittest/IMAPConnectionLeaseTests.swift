@@ -434,7 +434,15 @@ final class IMAPConnectionLeaseTests: XCTestCase {
             XCTAssertNil(session.acquireConnection(folder: nil), "the only connection is leased")
         }
 
-        guard let reacquired = session.acquireConnection(folder: nil) else {
+        // The dropped handle returns its lease on the session's queue - the main queue here -
+        // so the pool frees up once that queue has run.
+        var reacquired: MCOIMAPAsyncConnection?
+        let deadline = Date(timeIntervalSinceNow: 5)
+        while reacquired == nil && Date() < deadline {
+            RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.02))
+            reacquired = session.acquireConnection(folder: nil)
+        }
+        guard let reacquired = reacquired else {
             return XCTFail("A dropped handle must have returned its lease to the pool")
         }
         session.releaseConnection(reacquired, disconnect: false)

@@ -194,8 +194,12 @@ public class MCOIMAPSession: NSObjectCompat {
      contract as acquireConnection(folder:).
      */
     public func releaseConnection(_ connection: MCOIMAPAsyncConnection, disconnect: Bool) {
+        releaseConnection(connection.connection, leaseGeneration: connection.leaseGeneration, disconnect: disconnect)
+    }
+
+    internal func releaseConnection(_ connection: CIMAPAsyncConnection, leaseGeneration: UInt32, disconnect: Bool) {
         mailCoreAutoreleasePool {
-            session.releaseConnection(connection.connection, connection.leaseGeneration, disconnect)
+            session.releaseConnection(connection, leaseGeneration, disconnect)
         }
     }
 
