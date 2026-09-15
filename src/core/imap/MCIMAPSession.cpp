@@ -1122,9 +1122,8 @@ void IMAPSession::login(ErrorCode * pError)
     // identity() starts with connectIfNeeded(): with mShouldDisconnect raised meanwhile it tears the
     // connection down and rebuilds it, and its result is ignored above. A rebuilt connection is not
     // logged in - and a rebuild that failed has no mImap at all - so this must not read as a
-    // successful login; nor may one whose ignored ID left the stream marked for teardown, or
-    // whose stream was cut between two of its commands.
-    if (mState != STATE_LOGGEDIN || mShouldDisconnect || mStreamCancelled) {
+    // successful login; nor may one whose ignored ID left the stream marked for teardown.
+    if (mState != STATE_LOGGEDIN || mShouldDisconnect) {
         * pError = ErrorConnection;
         return;
     }
