@@ -1381,9 +1381,6 @@ void IMAPSession::noop(ErrorCode * pError)
 {
     int r;
     
-    if (mImap == NULL)
-        return;
-    
     MCLog("connect");
     loginIfNeeded(pError);
     if (* pError != ErrorNone) {
