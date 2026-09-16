@@ -237,8 +237,16 @@ final class IMAPInterruptCurrentCommandTests: XCTestCase {
 
             XCTAssertEqual(runningFinished.wait(timeout: .now() + 10), .success,
                            "interruptCurrentCommand() did not unblock the running command")
+
+            // The queued NOOP now runs and, its connection torn down by the interrupt, reconnects to
+            // the silent endpoint and blocks in turn - so it is the running operation now, and the
+            // same interrupt frees it.
+            XCTAssertEqual(queuedFinished.wait(timeout: .now() + 2), .timedOut,
+                           "The queued NOOP was expected to reconnect and block on the silent socket")
+            XCTAssertTrue(queued.interruptCurrentCommand(),
+                          "The queued operation was expected to be the running one by now")
             XCTAssertEqual(queuedFinished.wait(timeout: .now() + 10), .success,
-                           "The queued operation was expected to finish once the connection was freed")
+                           "interruptCurrentCommand() did not unblock the queued operation")
         }
     }
 }

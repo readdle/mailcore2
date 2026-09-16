@@ -180,6 +180,51 @@ final class IMAPConnectionLeaseTests: XCTestCase {
         }
     }
 
+    /// A NOOP is the probe the client sends to learn whether a connection is up and its
+    /// credentials still good, and the command its keep-alive uses to hold a pooled connection
+    /// warm. Both are pointless on a connection that reports success without connecting - never
+    /// connected, or torn down behind the keep-alive.
+    func testNoopConnectsAColdConnection() throws {
+        let endpoint = try LeaseTestTCPEndpoint(greeting: "* OK [CAPABILITY IMAP4rev1] LeaseTestTCPEndpoint ready\r\n",
+                                                answers: ["LOGIN": "",
+                                                          "CAPABILITY": "* CAPABILITY IMAP4rev1\r\n",
+                                                          "LIST": "* LIST (\\Noselect) \"/\" \"\"\r\n",
+                                                          "NOOP": ""])
+        defer { endpoint.stop() }
+
+        let session = makeSession(port: endpoint.port, maximumConnections: 1)
+
+        guard let leased = session.acquireConnection(folder: nil) else {
+            return XCTFail("An empty pool with room for 1 connection must satisfy the lease")
+        }
+
+        func noop() -> Error? {
+            let noop = session.noopOperation()
+            noop.setConnection(leased)
+            var error: Error?
+            let finished = DispatchSemaphore(value: 0)
+            noop.start { opError in
+                error = opError
+                finished.signal()
+            }
+            XCTAssertEqual(finished.wait(timeout: .now() + 5), .success)
+            return error
+        }
+
+        runOffMainThread(timeout: 30) {
+            XCTAssertNil(noop())
+            XCTAssertEqual(endpoint.acceptedClientCount, 1, "A NOOP on a never-connected connection must connect and log in")
+
+            XCTAssertEqual(self.start(leased.disconnectOperation()).wait(timeout: .now() + 5), .success)
+            XCTAssertTrue(endpoint.waitForClientDisconnect(timeout: 5))
+
+            XCTAssertNil(noop())
+            XCTAssertEqual(endpoint.acceptedClientCount, 2, "A NOOP on a torn-down connection must reconnect rather than report success")
+
+            session.releaseConnection(leased, disconnect: false)
+        }
+    }
+
     func testCutWithNothingOnTheWireReconnectsBeforeTheNextOperation() throws {
         // Every command is answered, so the NOOPs complete and the cut below meets no read in
         // flight - the case an interrupt of a running command cannot produce.
@@ -197,10 +242,6 @@ final class IMAPConnectionLeaseTests: XCTestCase {
         }
 
         runOffMainThread(timeout: 30) {
-            // A NOOP on a never-connected connection is a no-op, so connect first.
-            let connect = session.connectOperation()
-            connect.setConnection(leased)
-            XCTAssertEqual(self.start(connect).wait(timeout: .now() + 5), .success)
             let first = session.noopOperation()
             first.setConnection(leased)
             XCTAssertEqual(self.start(first).wait(timeout: .now() + 5), .success)
