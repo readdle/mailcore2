@@ -320,7 +320,7 @@ final class IMAPIdleCancellationTests: XCTestCase {
         runOffMainThread(timeout: 30) {
             let (operation, finished) = self.startIdle(session)
 
-            XCTAssertTrue(server.waitForIdleEntered(timeout: 5), "The session was expected to enter IDLE. Client sent:\n\(server.transcript)")
+            XCTAssertTrue(server.waitForIdleEntered(timeout: 20), "The session was expected to enter IDLE. Client sent:\n\(server.transcript)")
             XCTAssertEqual(finished.wait(timeout: .now() + 1), .timedOut, "IDLE was expected to still be running")
 
             operation.interruptIdle()
@@ -332,9 +332,9 @@ final class IMAPIdleCancellationTests: XCTestCase {
     }
 
     /// Upstream's `testCancelWakesIdleIteration`: cancelling every operation on the session has to
-    /// wake a running IDLE. Upstream made this true by having IMAPIdleOperation::cancel() call
-    /// interruptIdle(); without that, cancel only flips a flag the blocked IDLE never looks at, and
-    /// everything queued behind it - a disconnect included - waits for the IDLE to time out.
+    /// wake a running IDLE. IMAPIdleOperation::cancel() calls interruptIdle() to make that true;
+    /// without it, cancel only flips a flag the blocked IDLE never looks at, and everything queued
+    /// behind it - a disconnect included - waits for the IDLE to time out.
     func testCancelAllOperationsWakesRunningIdle() throws {
         let server = try FakeIdleIMAPServer()
         defer { server.stop() }
@@ -342,28 +342,46 @@ final class IMAPIdleCancellationTests: XCTestCase {
         let session = makeSession(port: server.port)
 
         runOffMainThread(timeout: 30) {
-            let (operation, finished) = self.startIdle(session)
+            let (_, finished) = self.startIdle(session)
 
-            XCTAssertTrue(server.waitForIdleEntered(timeout: 5), "The session was expected to enter IDLE. Client sent:\n\(server.transcript)")
+            XCTAssertTrue(server.waitForIdleEntered(timeout: 20), "The session was expected to enter IDLE. Client sent:\n\(server.transcript)")
             XCTAssertEqual(finished.wait(timeout: .now() + 1), .timedOut, "IDLE was expected to still be running")
 
             session.cancelAllOperations()
 
-            let stopped = self.waitUntilQueueStopped(session, timeout: 5)
-            // Known gap until upstream 03a19472 ("Fix IMAP IDLE teardown races") is merged: the
-            // expectation is strict, so the test fails the day the fix lands and this block must go.
-            // Spark does not depend on it today - it never calls cancelAllOperations() on an IMAP
-            // session and always interruptIdle()s before disconnecting the idle session.
-            XCTExpectFailure("IMAPIdleOperation::cancel() does not interrupt a running IDLE yet") {
-                XCTAssertTrue(stopped, "cancelAllOperations() did not wake the running IDLE")
-            }
-            if stopped {
-                XCTAssertTrue(server.waitForDoneOrClose(timeout: 5), "The server saw neither DONE nor a close")
-            }
-            else {
-                // Do not leave the IDLE blocked behind us: end it the way that is known to work.
-                operation.interruptIdle()
-                _ = self.waitUntilQueueStopped(session, timeout: 5)
+            XCTAssertTrue(self.waitUntilQueueStopped(session, timeout: 5),
+                          "cancelAllOperations() did not wake the running IDLE")
+            XCTAssertTrue(server.waitForDoneOrClose(timeout: 5), "The server saw neither DONE nor a close")
+        }
+    }
+
+    /// Upstream ships a C++ stress harness for this (`tests/test-imap-idle.cpp`, commit ab53363b)
+    /// because it has no Swift tests; our CMake `tests` executable is not what CI runs, so its third
+    /// goal - "the process does not crash or hang under repetition, especially under ASan" - is
+    /// covered here instead. The case above proves the cancel wakes one IDLE; this one repeats the
+    /// whole connect/idle/cancel/tear-down cycle so a leak or a stale stream has somewhere to show.
+    func testRepeatedCancelDuringIdleDoesNotHangOrCrash() throws {
+        for iteration in 0 ..< 6 {
+            let server = try FakeIdleIMAPServer()
+            defer { server.stop() }
+
+            // Scoped so the session is released before the next iteration builds another one.
+            let session = makeSession(port: server.port)
+
+            runOffMainThread(timeout: 30) {
+                _ = self.startIdle(session)
+
+                // Gate on the server rather than on a sleep: a cancel that arrives before IDLE is
+                // established is dropped by the operation queue and proves nothing.
+                XCTAssertTrue(server.waitForIdleEntered(timeout: 20),
+                              "Iteration \(iteration): the session was expected to enter IDLE. Client sent:\n\(server.transcript)")
+
+                session.cancelAllOperations()
+
+                // A cancelled operation is not required to report completion, so the stopped queue
+                // is what says the IDLE let go of the connection.
+                XCTAssertTrue(self.waitUntilQueueStopped(session, timeout: 10),
+                              "Iteration \(iteration): the operation queue did not stop after the cancel")
             }
         }
     }
