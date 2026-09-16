@@ -50,11 +50,10 @@ namespace mailcore {
          the operations queued behind it (a disconnect, most importantly) run immediately.
          Does nothing when the operation is not the one running.
 
-         Teardown of this connection only - the cut command fails with a connection error and the
-         connection is rebuilt before the one after; landing with no command on the wire, it is the
-         next command that fails and the one after that rebuilds - so call it for a command that is
-         being abandoned (cancelled, or given up on), never to hurry up a command whose result still
-         matters.
+         Teardown of this connection only - a command in flight fails with a connection error, a
+         cut that met none fails nothing, and either way the connection is rebuilt before the next
+         operation's first command - so call it for a command that is being abandoned (cancelled,
+         or given up on), never to hurry up a command whose result still matters.
          Returns whether this operation was the one the queue was running at that moment. That may
          include a command that finished just as the interrupt landed: its result is intact, but
          the stream is cancelled all the same. */

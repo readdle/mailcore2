@@ -305,6 +305,11 @@ void IMAPAsyncConnection::scheduleReconnect()
     mSession->scheduleReconnect();
 }
 
+void IMAPAsyncConnection::cancelStream()
+{
+    mSession->interruptCurrentCommand();
+}
+
 unsigned int IMAPAsyncConnection::operationsCount()
 {
     return mQueue->count();
