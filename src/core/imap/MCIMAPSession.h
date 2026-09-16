@@ -316,6 +316,10 @@ namespace mailcore {
         unsigned int mLastFetchedSequenceNumber;
         String * mCurrentFolder;
 		MCB_LOCK_TYPE mIdleLock;
+        // Signalled under mIdleLock when mIdleInProgress drops: teardown waits on it rather than
+        // freeing the stream idle() is still blocked on.
+        MCB_COND_TYPE mIdleCond;
+        bool mIdleInProgress;
         // Written on this session's own thread, read by IMAPAsyncSession's connection selection
         // through IMAPAsyncConnection::needsReconnect: atomic so that read is defined.
         // mShouldDisconnect has one more writer, scheduleReconnect(), on any thread.
