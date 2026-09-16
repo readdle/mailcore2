@@ -28,9 +28,9 @@ namespace mailcore {
          It does not stop `op` itself from finishing - main() runs without the lock - so an
          operation that completes just as the caller reaches it gets a harmless interrupt on an
          idle stream. Lets a caller abort "the command my operation is running" without the risk
-         of aborting somebody else's. Returns whether interrupt() was called - a caller that
-         measures the effect needs to tell "there was a command to break" from "there was
-         nothing". */
+         of aborting somebody else's. Returns what interrupt() reported, so it is true only when
+         `op` was the running one and had something to break - a caller that measures the effect
+         needs to tell "there was a command to break" from "there was nothing". */
         virtual bool interruptRunningOperation(Operation * op);
         
         virtual unsigned int count();

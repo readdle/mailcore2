@@ -76,8 +76,7 @@ bool OperationQueue::interruptRunningOperation(Operation * op)
     // this queue.
     MCB_LOCK(&mLock);
     if ((op != NULL) && (mRunningOperation == op)) {
-        op->interrupt();
-        interrupted = true;
+        interrupted = op->interrupt();
     }
     MCB_UNLOCK(&mLock);
 

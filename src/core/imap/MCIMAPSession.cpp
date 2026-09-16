@@ -3780,7 +3780,7 @@ void IMAPSession::disconnect()
     unsetup();
 }
 
-void IMAPSession::interruptCurrentCommand()
+bool IMAPSession::interruptCurrentCommand()
 {
     // mailstream_cancel() must be called while holding the lock: unsetup() nils mImap under it and
     // frees the stream right after releasing it, so a pointer grabbed and used outside the lock
@@ -3788,7 +3788,11 @@ void IMAPSession::interruptCurrentCommand()
     // object's own mutex and writes one byte to a pipe - but acquiring the lock can now wait out a
     // teardown that is itself waiting for an IDLE to unwind, so this is no longer a bounded wait.
     LOCK();
-    if (mImap != NULL && mImap->imap_stream != NULL) {
+    // False until libetpan has a stream: DNS, the TCP connect and, on an implicit-TLS session,
+    // the handshake all run before mailimap_connect() assigns one, and a connect blocked in any of
+    // them is not reachable from here. mImap itself is set earlier still, by setup().
+    bool cancelled = mImap != NULL && mImap->imap_stream != NULL;
+    if (cancelled) {
         // Deliberately not raising mShouldDisconnect here: the command this cuts fails with a
         // stream error and raises it itself, at a point its caller checks. Raised from this thread
         // it can land between two commands of one login(), where the nested connectIfNeeded()
@@ -3800,6 +3804,8 @@ void IMAPSession::interruptCurrentCommand()
         mailstream_cancel(mImap->imap_stream);
     }
     UNLOCK();
+
+    return cancelled;
 }
 
 IMAPIdentity * IMAPSession::identity(IMAPIdentity * clientIdentity, ErrorCode * pError)
