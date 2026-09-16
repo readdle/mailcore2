@@ -654,6 +654,9 @@ void IMAPSession::unsetup()
     mImap = NULL;
     mIdleEnabled = false;
     mStreamCancelled = false;
+    // Published with mImap, not after the stream is closed and freed: needsReconnect() reads the
+    // state from another thread and would otherwise call this session logged in meanwhile.
+    mState = STATE_DISCONNECTED;
     UNLOCK();
     
     if (imap != NULL) {
@@ -664,8 +667,6 @@ void IMAPSession::unsetup()
         mailimap_free(imap);
         imap = NULL;
     }
-    
-    mState = STATE_DISCONNECTED;
 }
 
 void IMAPSession::connect(ErrorCode * pError)
