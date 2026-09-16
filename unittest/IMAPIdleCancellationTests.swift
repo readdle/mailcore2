@@ -273,6 +273,8 @@ final class IMAPIdleCancellationTests: XCTestCase {
     }
 
     /// Runs the test body off the main thread while the main thread keeps spinning its run loop.
+    /// The budget has to clear the sum of the waits inside the body, not just the longest one: a
+    /// body that is merely slow must fail on its own assertion, not on this wrapper.
     /// mailcore hands parts of an operation's lifecycle to the main queue and waits for them, so a
     /// test that blocks the main thread never gets its operation started in the first place.
     private func runOffMainThread(timeout: TimeInterval, _ body: @escaping () -> Void) {
@@ -317,7 +319,7 @@ final class IMAPIdleCancellationTests: XCTestCase {
 
         let session = makeSession(port: server.port)
 
-        runOffMainThread(timeout: 30) {
+        runOffMainThread(timeout: 60) {
             let (operation, finished) = self.startIdle(session)
 
             XCTAssertTrue(server.waitForIdleEntered(timeout: 20), "The session was expected to enter IDLE. Client sent:\n\(server.transcript)")
@@ -341,7 +343,7 @@ final class IMAPIdleCancellationTests: XCTestCase {
 
         let session = makeSession(port: server.port)
 
-        runOffMainThread(timeout: 30) {
+        runOffMainThread(timeout: 60) {
             let (_, finished) = self.startIdle(session)
 
             XCTAssertTrue(server.waitForIdleEntered(timeout: 20), "The session was expected to enter IDLE. Client sent:\n\(server.transcript)")
@@ -368,7 +370,7 @@ final class IMAPIdleCancellationTests: XCTestCase {
             // Scoped so the session is released before the next iteration builds another one.
             let session = makeSession(port: server.port)
 
-            runOffMainThread(timeout: 30) {
+            runOffMainThread(timeout: 60) {
                 _ = self.startIdle(session)
 
                 // Gate on the server rather than on a sleep: a cancel that arrives before IDLE is
