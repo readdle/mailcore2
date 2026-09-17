@@ -191,15 +191,15 @@ bool IMAPOperation::interruptCurrentCommand()
     return mSession->interruptCurrentCommand(this);
 }
 
-void IMAPOperation::interrupt()
+bool IMAPOperation::interrupt()
 {
     // Called by the connection's queue while this operation is the one running, so the stream below
     // is the one its command is blocked on.
     if (mSession == NULL) {
-        return;
+        return false;
     }
 
-    mSession->session()->interruptCurrentCommand();
+    return mSession->session()->interruptCurrentCommand();
 }
 
 void IMAPOperation::afterMain()

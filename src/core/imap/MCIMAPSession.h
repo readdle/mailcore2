@@ -175,9 +175,13 @@ namespace mailcore {
         /** Aborts the command currently running on this session by cancelling its stream: the
          blocked read returns immediately instead of waiting out the socket timeout. Safe to call
          from another thread while the session's thread is blocked in a command.
+         Returns whether there was a stream to cancel. It is false until libetpan has one - DNS,
+         the TCP connect and, on an implicit-TLS session, the handshake all run before it exists -
+         and false again once the session has been torn down. False therefore says only that this
+         call broke nothing; a command blocked in one of those phases runs on to its timeout.
          Teardown only: the cancelled state of a stream is never reset, so the session is unusable
          afterwards and must be disconnected. A later connect() builds a fresh stream. */
-        virtual void interruptCurrentCommand();
+        virtual bool interruptCurrentCommand();
         
         virtual void noop(ErrorCode * pError);
         

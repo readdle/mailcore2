@@ -39,10 +39,12 @@ public class MCOIMAPBaseOperation : MCOOperation {
      before the next operation's first command - so call it for a command being abandoned, never to
      hurry up one whose result still matters.
 
-     - Returns: whether this operation was the one the queue was running at that moment. That may
-     include a command that finished just as the interrupt landed: its result is intact, but the
-     stream is cancelled all the same. `false` means nothing was holding the connection on this
-     operation's behalf.
+     - Returns: whether a command was actually cut, which needs this operation to be the one the
+     queue is running and its connection to have a stream. One still opening its socket - DNS, the
+     TCP connect, an implicit-TLS handshake - is running yet holds nothing breakable and answers
+     `false`, and its command runs on to its timeout. A `true` may still cover a command that
+     finished just as the interrupt landed: its result is intact, but the stream is cancelled all
+     the same.
      */
     @discardableResult
     public func interruptCurrentCommand() -> Bool {

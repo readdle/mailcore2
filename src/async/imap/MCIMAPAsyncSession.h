@@ -122,7 +122,10 @@ namespace mailcore {
          IMAPOperation::start was called, so an acquire racing a start can hand the same
          connection to both: the start sees it free, the acquire reserves it, and the operation
          is already queued. Serialize acquireConnection and releaseConnection with every
-         start() on this session, on a queue of your choosing. */
+         start() on this session, and do it on the session's own dispatch queue: the pool's
+         bookkeeping is touched from that queue as well - operationRunningStateChanged() walks
+         the connection list that a new connection is appended to - so any other queue
+         serializes the callers against each other and against nothing else. */
         virtual IMAPAsyncConnection * acquireConnection(String * folder);
         /*! Returns a reserved connection to the shared pool and re-arms its idle
          auto-disconnect. leaseGeneration is what the connection reported right after

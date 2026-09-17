@@ -172,8 +172,9 @@ public class MCOIMAPSession: NSObjectCompat {
      safe on its own. Selection reads it from within MCOIMAPBaseOperation.start, on whatever
      thread calls that, so an acquire racing a start can hand the same connection to both: the
      start sees it free, the acquire reserves it, and the operation is already queued. Serialize
-     acquireConnection and releaseConnection with every start() on this session, on a queue of
-     your choosing.
+     acquireConnection and releaseConnection with every start() on this session, and do it on the
+     session's own dispatch queue: the pool's bookkeeping is touched from that queue as well, so
+     any other queue serializes the callers against each other and against nothing else.
      */
     public func acquireConnection(folder: String?) -> MCOIMAPAsyncConnection? {
         return mailCoreAutoreleasePool {

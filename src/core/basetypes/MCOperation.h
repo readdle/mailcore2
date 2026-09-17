@@ -23,8 +23,10 @@ namespace mailcore {
 
         /** Aborts whatever this operation is doing right now. Called by the queue, and only while
          this operation is the one it is executing - so an implementation may assume it owns the
-         resource it is about to break. Does nothing by default. */
-        virtual void interrupt();
+         resource it is about to break. Returns whether it actually broke anything: being the
+         running operation is not enough, an operation can be running and hold nothing breakable
+         yet. Does nothing and answers false by default. */
+        virtual bool interrupt();
 
         virtual bool isCancelled();
         

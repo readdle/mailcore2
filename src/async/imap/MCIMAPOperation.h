@@ -43,7 +43,7 @@ namespace mailcore {
         
         virtual void beforeMain();
         virtual void afterMain();
-        virtual void interrupt();
+        virtual bool interrupt();
 
         /** Aborts this operation's IMAP command if it is the one currently running on its
          connection: the blocked read returns at once instead of waiting out the socket timeout, so
@@ -54,9 +54,11 @@ namespace mailcore {
          cut that met none fails nothing, and either way the connection is rebuilt before the next
          operation's first command - so call it for a command that is being abandoned (cancelled,
          or given up on), never to hurry up a command whose result still matters.
-         Returns whether this operation was the one the queue was running at that moment. That may
-         include a command that finished just as the interrupt landed: its result is intact, but
-         the stream is cancelled all the same. */
+         Returns whether a command was actually cut, which needs this operation to be the one the
+         queue is running and its connection to have a stream: one still opening its socket - DNS,
+         the TCP connect, an implicit-TLS handshake - is running and has nothing to break, and
+         answers false. A true may still cover a command that finished just as the interrupt
+         landed: its result is intact, but the stream is cancelled all the same. */
         virtual bool interruptCurrentCommand();
         
         virtual void start();
