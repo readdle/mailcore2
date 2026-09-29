@@ -36,6 +36,7 @@ final class LeaseTestTCPEndpoint {
     private let answers: [String: String]
     private let refusals: [String: Refusal]
     private let beforeAnswering: [String: () -> Void]
+    private let replies: ((String) -> String?)?
     private let acceptQueue = DispatchQueue(label: "LeaseTestTCPEndpoint.accept")
     private let lock = NSLock()
     private var acceptedSockets: [Int32] = []
@@ -52,12 +53,18 @@ final class LeaseTestTCPEndpoint {
     /// a block once a listed command has arrived and before it is answered - while the client is
     /// blocked in that command's read, which is the one moment a test can act on it from another
     /// thread with a known position in the client's command sequence. `refusals` answers a listed
-    /// command with its own reply instead.
-    init(greeting: String? = nil, answers: [String: String] = [:], refusals: [String: Refusal] = [:], beforeAnswering: [String: () -> Void] = [:]) throws {
+    /// command with its own reply instead. `replies` serves untagged line protocols (SMTP): it maps each
+    /// received line to the text to send back, nil for none.
+    init(greeting: String? = nil,
+         answers: [String: String] = [:],
+         refusals: [String: Refusal] = [:],
+         beforeAnswering: [String: () -> Void] = [:],
+         replies: ((String) -> String?)? = nil) throws {
         self.greeting = greeting
         self.answers = answers
         self.refusals = refusals
         self.beforeAnswering = beforeAnswering
+        self.replies = replies
 
         // Everything below works on a local descriptor: a closure that touched `listeningSocket`
         // would capture self before `port` is initialized.
@@ -149,6 +156,7 @@ final class LeaseTestTCPEndpoint {
             let answers = self.answers
             let refusals = self.refusals
             let beforeAnswering = self.beforeAnswering
+            let replies = self.replies
             DispatchQueue.global().async { [weak self] in
                 var buffer = [UInt8](repeating: 0, count: 1024)
                 var pending = ""
@@ -158,13 +166,20 @@ final class LeaseTestTCPEndpoint {
                     guard received > 0 else {
                         break
                     }
-                    guard answers.isEmpty == false || refusals.isEmpty == false else {
+                    guard answers.isEmpty == false || refusals.isEmpty == false || replies != nil else {
                         continue
                     }
                     pending += String(decoding: buffer[0..<Int(received)], as: UTF8.self)
                     while let lineEnd = pending.range(of: "\r\n") {
                         let line = String(pending[..<lineEnd.lowerBound])
                         pending.removeSubrange(..<lineEnd.upperBound)
+                        if let replies = replies {
+                            if let text = replies(line) {
+                                let reply = Array(text.utf8)
+                                _ = reply.withUnsafeBufferPointer { send(accepted, $0.baseAddress!, $0.count, 0) }
+                            }
+                            continue
+                        }
                         let words = line.split(separator: " ")
                         guard words.count >= 2 else {
                             continue

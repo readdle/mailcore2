@@ -55,6 +55,9 @@ void SMTPCheckAccountOperation::main()
     else {
         session()->session()->checkAccount(mFrom, &error);
     }
+    // Whatever the outcome, a check keeps no connection: a server capping connections per IP would
+    // count it against the next check until the 30 s automatic disconnect.
+    session()->session()->disconnect();
     
     setError(error);
 }
