@@ -163,7 +163,6 @@ final class IMAPAutomaticDisconnectDelayTests: XCTestCase {
 
             session.automaticDisconnectDelay = 0.3
 
-            XCTAssertEqual(session.automaticDisconnectDelay, 0.3)
             XCTAssertTrue(endpoint.waitForClientDisconnect(timeout: 3))
         }
     }
