@@ -71,7 +71,7 @@ extern "C" {
     C_SYNTHESIZE_PROPERTY_DEFINITION(CIMAPAsyncSession, MailCoreString, OAuth2Token, setOAuth2Token)
     C_SYNTHESIZE_PROPERTY_DEFINITION(CIMAPAsyncSession, CAuthType, authType, setAuthType)
     C_SYNTHESIZE_PROPERTY_DEFINITION(CIMAPAsyncSession, unsigned int, maximumConnections, setMaximumConnections)
-    C_SYNTHESIZE_PROPERTY_DEFINITION(CIMAPAsyncSession, time_t, automaticDisconnectDelay, setAutomaticDisconnectDelay)
+    C_SYNTHESIZE_PROPERTY_DEFINITION(CIMAPAsyncSession, double, automaticDisconnectDelay, setAutomaticDisconnectDelay)
     C_SYNTHESIZE_PROPERTY_DEFINITION(CIMAPAsyncSession, bool, allowsFolderConcurrentAccessEnabled, setAllowsFolderConcurrentAccessEnabled)
     C_SYNTHESIZE_PROPERTY_DEFINITION(CIMAPAsyncSession, CIMAPNamespace, defaultNamespace, setDefaultNamespace)
     C_SYNTHESIZE_PROPERTY_DEFINITION(CIMAPAsyncSession, CIMAPIdentity, clientIdentity, setClientIdentity)

@@ -56,6 +56,7 @@ IMAPAsyncSession::IMAPAsyncSession()
     mMaximumConnections = DEFAULT_MAX_CONNECTIONS;
     mAllowsFolderConcurrentAccessEnabled = true;
     mAutomaticDisconnectDelay = 30;
+    MCB_LOCK_INIT(&mAutomaticDisconnectDelayLock);
 
     mHostname = NULL;
     mPort = 0;
@@ -84,6 +85,7 @@ IMAPAsyncSession::IMAPAsyncSession()
 
 IMAPAsyncSession::~IMAPAsyncSession()
 {
+    MCB_LOCK_DESTROY(&mAutomaticDisconnectDelayLock);
 #if MC_HAS_GCD
     if (mDispatchQueue != NULL) {
         dispatch_release(mDispatchQueue);
@@ -240,14 +242,37 @@ unsigned int IMAPAsyncSession::maximumConnections()
     return mMaximumConnections;
 }
 
-void IMAPAsyncSession::setAutomaticDisconnectDelay(time_t delay)
+void IMAPAsyncSession::setAutomaticDisconnectDelay(double delay)
 {
+    MCB_LOCK(&mAutomaticDisconnectDelayLock);
     mAutomaticDisconnectDelay = delay;
+    MCB_UNLOCK(&mAutomaticDisconnectDelayLock);
+
+    // The pool and the idle timers belong to the dispatch queue. Kept alive until the hop lands,
+    // like the connection's own hop in scheduleAutomaticDisconnect.
+    retain();
+#if MC_HAS_GCD
+    performMethodOnDispatchQueue((Object::Method) &IMAPAsyncSession::applyAutomaticDisconnectDelay, NULL, dispatchQueue());
+#else
+    performMethodOnMainThread((Object::Method) &IMAPAsyncSession::applyAutomaticDisconnectDelay, NULL);
+#endif
 }
 
-time_t IMAPAsyncSession::automaticDisconnectDelay()
+double IMAPAsyncSession::automaticDisconnectDelay()
 {
-    return mAutomaticDisconnectDelay;
+    MCB_LOCK(&mAutomaticDisconnectDelayLock);
+    double delay = mAutomaticDisconnectDelay;
+    MCB_UNLOCK(&mAutomaticDisconnectDelayLock);
+    return delay;
+}
+
+void IMAPAsyncSession::applyAutomaticDisconnectDelay(void * context)
+{
+    for (unsigned int i = 0 ; i < mSessions->count() ; i ++) {
+        IMAPAsyncConnection * connection = (IMAPAsyncConnection *) mSessions->objectAtIndex(i);
+        connection->restartAutomaticDisconnect();
+    }
+    release();
 }
 
 IMAPIdentity * IMAPAsyncSession::serverIdentity()
@@ -290,7 +315,6 @@ IMAPAsyncConnection * IMAPAsyncSession::session()
     session->setAuthType(mAuthType);
     session->setConnectionType(mConnectionType);
     session->setTimeout(mTimeout);
-    session->setAutomaticDisconnectDelay(mAutomaticDisconnectDelay);
     session->setCheckCertificateEnabled(mCheckCertificateEnabled);
     session->setVoIPEnabled(mVoIPEnabled);
     session->setDefaultNamespace(mDefaultNamespace);

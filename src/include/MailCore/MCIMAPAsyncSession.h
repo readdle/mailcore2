@@ -94,10 +94,11 @@ namespace mailcore {
         virtual void setMaximumConnections(unsigned int maxConnections);
         virtual unsigned int maximumConnections();
 
-        // How long an idle connection stays open once its queue drains, in seconds.
-        // Applied to connections created after the change.
-        virtual void setAutomaticDisconnectDelay(time_t delay);
-        virtual time_t automaticDisconnectDelay();
+        // How long an idle connection stays open once its queue drains, in seconds. Callable from
+        // any thread: an idle timer already running starts over with the new delay, on the
+        // session's dispatch queue.
+        virtual void setAutomaticDisconnectDelay(double delay);
+        virtual double automaticDisconnectDelay();
 
         /*! Reserves a connection for exclusive use: the regular per-operation selection stops
          seeing it, so only operations explicitly pointed at it (IMAPOperation::setSession) run
@@ -234,11 +235,14 @@ namespace mailcore {
         
     public: // private
         virtual void automaticConfigurationDone(IMAPSession * session);
+        virtual void applyAutomaticDisconnectDelay(void * context);
         virtual void operationRunningStateChanged();
         virtual IMAPAsyncConnection * sessionForFolder(String * folder, bool urgent = false);
         
     private:
         Array * mSessions;
+        // Written on the caller's thread, read by the connections when they arm their idle timer.
+        MCB_LOCK_TYPE mAutomaticDisconnectDelayLock;
         
         String * mHostname;
         unsigned int mPort;
@@ -254,7 +258,7 @@ namespace mailcore {
         time_t mTimeout;
         bool mAllowsFolderConcurrentAccessEnabled;
         unsigned int mMaximumConnections;
-        time_t mAutomaticDisconnectDelay;
+        double mAutomaticDisconnectDelay;
         ConnectionLogger * mConnectionLogger;
         bool mAutomaticConfigurationDone;
         IMAPIdentity * mServerIdentity;

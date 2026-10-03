@@ -115,7 +115,6 @@ IMAPAsyncConnection::IMAPAsyncConnection()
     mScheduledAutomaticDisconnect = false;
     mReserved = false;
     mLeaseGeneration = 0;
-    mAutomaticDisconnectDelay = 30;
 }
 
 IMAPAsyncConnection::~IMAPAsyncConnection()
@@ -363,9 +362,11 @@ bool IMAPAsyncConnection::isReserved()
     return reserved;
 }
 
-void IMAPAsyncConnection::setAutomaticDisconnectDelay(time_t delay)
+void IMAPAsyncConnection::restartAutomaticDisconnect()
 {
-    mAutomaticDisconnectDelay = delay;
+    if (mScheduledAutomaticDisconnect) {
+        tryAutomaticDisconnect();
+    }
 }
 
 bool IMAPAsyncConnection::interruptCurrentCommand(IMAPOperation * operation)
@@ -413,9 +414,9 @@ void IMAPAsyncConnection::tryAutomaticDisconnect()
     mOwner->retain();
     mScheduledAutomaticDisconnect = true;
 #if MC_HAS_GCD
-    performMethodOnDispatchQueueAfterDelay((Object::Method) &IMAPAsyncConnection::tryAutomaticDisconnectAfterDelay, NULL, dispatchQueue(), (double) mAutomaticDisconnectDelay);
+    performMethodOnDispatchQueueAfterDelay((Object::Method) &IMAPAsyncConnection::tryAutomaticDisconnectAfterDelay, NULL, dispatchQueue(), mOwner->automaticDisconnectDelay());
 #else
-    performMethodAfterDelay((Object::Method) &IMAPAsyncConnection::tryAutomaticDisconnectAfterDelay, NULL, (double) mAutomaticDisconnectDelay);
+    performMethodAfterDelay((Object::Method) &IMAPAsyncConnection::tryAutomaticDisconnectAfterDelay, NULL, mOwner->automaticDisconnectDelay());
 #endif
 
     if (scheduledAutomaticDisconnect) {
