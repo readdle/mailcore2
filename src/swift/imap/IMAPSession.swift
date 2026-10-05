@@ -145,6 +145,15 @@ public class MCOIMAPSession: NSObjectCompat {
     }
 
     /**
+     How long an idle connection stays open once its work is done, in seconds. Settable from any
+     thread at any time: an idle timer already running starts over with the new delay.
+     */
+    public var automaticDisconnectDelay: TimeInterval {
+        get { return session.automaticDisconnectDelay }
+        set { session.automaticDisconnectDelay = newValue }
+    }
+
+    /**
      Reserves one connection of the pool for exclusive use: the regular per-operation selection
      stops seeing it, so new commands run on it only when explicitly pointed at it with
      MCOIMAPBaseOperation.setConnection(_:), and the idle auto-disconnect stands down until

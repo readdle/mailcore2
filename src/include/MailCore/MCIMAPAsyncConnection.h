@@ -93,8 +93,9 @@ namespace mailcore {
         
         virtual IMAPOperation * disconnectOperation();
 
-        // How long an idle connection stays open once its queue drains.
-        virtual void setAutomaticDisconnectDelay(time_t delay);
+        // Dispatch queue only. An idle timer already running starts over with the owner's current
+        // automaticDisconnectDelay.
+        virtual void restartAutomaticDisconnect();
 
     private:
         IMAPSession * mSession;
@@ -115,7 +116,6 @@ namespace mailcore {
         MCB_LOCK_TYPE mReservationLock;
         bool mReserved;
         unsigned int mLeaseGeneration;
-        time_t mAutomaticDisconnectDelay;
         
         virtual void tryAutomaticDisconnectAfterDelay(void * context);
         virtual void scheduleAutomaticDisconnectOnQueue(void * context);
