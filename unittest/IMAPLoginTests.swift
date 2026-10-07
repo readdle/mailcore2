@@ -153,11 +153,6 @@ final class IMAPLoginTests: XCTestCase {
                         failsWith: .errorIMAPTooManySimultaneousConnections)
     }
 
-    func testLimitWithoutByeIsTooManyConnections() throws {
-        try assertLogin(refusedWith: .init(reply: { "\($0) NO [LIMIT] Too many sessions\r\n" }, closesConnection: false),
-                        failsWith: .errorIMAPTooManySimultaneousConnections)
-    }
-
     func testGmailTooManyConnectionsTextIsStillRecognized() throws {
         try assertLogin(refusedWith: .init(reply: { "\($0) NO [ALERT] Too many simultaneous connections. (Failure)\r\n" }, closesConnection: false),
                         failsWith: .errorGmailTooManySimultaneousConnections)

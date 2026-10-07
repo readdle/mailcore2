@@ -969,9 +969,8 @@ void IMAPSession::login(ErrorCode * pError)
     if (r == MAILIMAP_ERROR_STREAM) {
         mShouldDisconnect = true;
         * pError = ErrorConnection;
-        // libetpan stops at an untagged BYE and leaves the tagged reply after it unparsed in the
-        // stream buffer - Yahoo and AOL refuse a session over their limit with `* BYE` and then
-        // `NO [LIMIT]`.
+        // Yahoo and AOL refuse a session over their limit with `* BYE` and then `NO [LIMIT]`:
+        // libetpan stops at the BYE, and the tagged refusal stays in the stream buffer.
         if (mImap->imap_stream_buffer != NULL && mImap->imap_stream_buffer->str != NULL &&
             strstr(mImap->imap_stream_buffer->str, " NO [LIMIT]") != NULL) {
             * pError = ErrorIMAPTooManySimultaneousConnections;
@@ -998,14 +997,7 @@ void IMAPSession::login(ErrorCode * pError)
             response = String::stringWithUTF8Characters(mImap->imap_response);
         }
         MC_SAFE_REPLACE_COPY(String, mLoginResponse, response);
-        // The RFC 5530 response code, which `response` does not carry: libetpan keeps it apart.
-        if (r == MAILIMAP_ERROR_LOGIN && mImap->imap_response_info != NULL && mImap->imap_response_info->rsp_atom != NULL &&
-            strcasecmp(mImap->imap_response_info->rsp_atom, "LIMIT") == 0) {
-            // Dropped like the refusal after a BYE, so the next login reads no stale reply.
-            mShouldDisconnect = true;
-            * pError = ErrorIMAPTooManySimultaneousConnections;
-        }
-        else if (response->locationOfString(MCSTR("not enabled for IMAP use")) != -1) {
+        if (response->locationOfString(MCSTR("not enabled for IMAP use")) != -1) {
             * pError = ErrorGmailIMAPNotEnabled;
         }
         else if (response->locationOfString(MCSTR("IMAP access is disabled")) != -1) {
