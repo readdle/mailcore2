@@ -96,6 +96,77 @@ final class IMAPLoginTests: XCTestCase {
             session.releaseConnection(leased, disconnect: false)
         }
     }
+
+    // MARK: - Login refusals
+
+    private enum LoginCommand: String {
+        case login = "LOGIN"
+        case xoAuth2 = "AUTHENTICATE"
+    }
+
+    /// The error a login gets when the server answers it with `refusal`.
+    private func loginError(refusedWith refusal: LeaseTestTCPEndpoint.Refusal, command: LoginCommand) throws -> NSError? {
+        let endpoint = try LeaseTestTCPEndpoint(greeting: "* OK [CAPABILITY IMAP4rev1 AUTH=PLAIN AUTH=XOAUTH2] LeaseTestTCPEndpoint ready\r\n",
+                                                refusals: [command.rawValue: refusal])
+        defer { endpoint.stop() }
+
+        let session = MCOIMAPSession()
+        session.hostname = "127.0.0.1"
+        session.port = UInt32(endpoint.port)
+        session.connectionType = ConnectionTypeClear
+        session.username = "user"
+        switch command {
+        case .login:
+            session.password = "password"
+        case .xoAuth2:
+            session.authType = .XOAuth2
+            session.OAuth2Token = "token"
+        }
+        session.timeout = 10
+        session.maximumConnections = 1
+
+        var error: NSError?
+        runOffMainThread(timeout: 30) {
+            let finished = DispatchSemaphore(value: 0)
+            session.checkAccountOperation().start { opError in
+                error = opError as NSError?
+                finished.signal()
+            }
+            XCTAssertEqual(finished.wait(timeout: .now() + 20), .success)
+        }
+        return error
+    }
+
+    private func assertLogin(refusedWith refusal: LeaseTestTCPEndpoint.Refusal, failsWith code: MailCoreError,
+                             file: StaticString = #filePath, line: UInt = #line) throws {
+        for command in [LoginCommand.login, .xoAuth2] {
+            let error = try loginError(refusedWith: refusal, command: command)
+            XCTAssertEqual(error?.code, Int(code.rawValue), "\(command): \(String(describing: error))", file: file, line: line)
+        }
+    }
+
+    /// Yahoo and AOL refuse a login over their limit of simultaneous sessions with `* BYE` and
+    /// then `NO [LIMIT]`; libetpan stops at the BYE, so the code is only in the buffered tagged line.
+    func testLimitAfterByeIsTooManyConnections() throws {
+        try assertLogin(refusedWith: .init(reply: { "* BYE IMAP4rev1 Server logging out\r\n\($0) NO [LIMIT] AUTHENTICATE Rate limit hit.\r\n" },
+                                           closesConnection: true),
+                        failsWith: .errorIMAPTooManySimultaneousConnections)
+    }
+
+    func testGmailTooManyConnectionsTextIsStillRecognized() throws {
+        try assertLogin(refusedWith: .init(reply: { "\($0) NO [ALERT] Too many simultaneous connections. (Failure)\r\n" }, closesConnection: false),
+                        failsWith: .errorGmailTooManySimultaneousConnections)
+    }
+
+    func testWrongCredentialsStayAnAuthenticationError() throws {
+        try assertLogin(refusedWith: .init(reply: { "\($0) NO [AUTHENTICATIONFAILED] Invalid credentials\r\n" }, closesConnection: false),
+                        failsWith: .errorAuthentication)
+    }
+
+    func testByeWithoutTaggedReplyStaysAConnectionError() throws {
+        try assertLogin(refusedWith: .init(reply: { _ in "* BYE IMAP4rev1 Server logging out\r\n" }, closesConnection: true),
+                        failsWith: .errorConnection)
+    }
 }
 
 #endif

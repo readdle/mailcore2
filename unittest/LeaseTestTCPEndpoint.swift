@@ -23,9 +23,18 @@ import Foundation
 /// down by closing the socket, reported here through waitForClientDisconnect().
 final class LeaseTestTCPEndpoint {
 
+    /// A reply that refuses a command instead of the default tagged OK.
+    struct Refusal {
+        /// Lines to send for the command's tag, tagged line included.
+        let reply: (_ tag: String) -> String
+        /// Close the socket right after the reply, as a server does after an untagged BYE.
+        let closesConnection: Bool
+    }
+
     private let listeningSocket: Int32
     private let greeting: String?
     private let answers: [String: String]
+    private let refusals: [String: Refusal]
     private let beforeAnswering: [String: () -> Void]
     private let acceptQueue = DispatchQueue(label: "LeaseTestTCPEndpoint.accept")
     private let lock = NSLock()
@@ -42,10 +51,12 @@ final class LeaseTestTCPEndpoint {
     /// the client to a chosen state; any command not listed still blocks. `beforeAnswering` runs
     /// a block once a listed command has arrived and before it is answered - while the client is
     /// blocked in that command's read, which is the one moment a test can act on it from another
-    /// thread with a known position in the client's command sequence.
-    init(greeting: String? = nil, answers: [String: String] = [:], beforeAnswering: [String: () -> Void] = [:]) throws {
+    /// thread with a known position in the client's command sequence. `refusals` answers a listed
+    /// command with its own reply instead.
+    init(greeting: String? = nil, answers: [String: String] = [:], refusals: [String: Refusal] = [:], beforeAnswering: [String: () -> Void] = [:]) throws {
         self.greeting = greeting
         self.answers = answers
+        self.refusals = refusals
         self.beforeAnswering = beforeAnswering
 
         // Everything below works on a local descriptor: a closure that touched `listeningSocket`
@@ -136,16 +147,18 @@ final class LeaseTestTCPEndpoint {
             // descriptor; stop() only shuts the socket down, which wakes recv(), and the close
             // happens here.
             let answers = self.answers
+            let refusals = self.refusals
             let beforeAnswering = self.beforeAnswering
             DispatchQueue.global().async { [weak self] in
                 var buffer = [UInt8](repeating: 0, count: 1024)
                 var pending = ""
-                while true {
+                var refusedAndClosed = false
+                while refusedAndClosed == false {
                     let received = recv(accepted, &buffer, buffer.count, 0)
                     guard received > 0 else {
                         break
                     }
-                    guard answers.isEmpty == false else {
+                    guard answers.isEmpty == false || refusals.isEmpty == false else {
                         continue
                     }
                     pending += String(decoding: buffer[0..<Int(received)], as: UTF8.self)
@@ -153,12 +166,26 @@ final class LeaseTestTCPEndpoint {
                         let line = String(pending[..<lineEnd.lowerBound])
                         pending.removeSubrange(..<lineEnd.upperBound)
                         let words = line.split(separator: " ")
-                        guard words.count >= 2, let untagged = answers[words[1].uppercased()] else {
+                        guard words.count >= 2 else {
                             continue
                         }
-                        beforeAnswering[words[1].uppercased()]?()
-                        let reply = Array((untagged + "\(words[0]) OK \(words[1]) completed\r\n").utf8)
+                        let command = words[1].uppercased()
+                        let reply: [UInt8]
+                        if let refusal = refusals[command] {
+                            reply = Array(refusal.reply(String(words[0])).utf8)
+                            refusedAndClosed = refusal.closesConnection
+                        }
+                        else if let untagged = answers[command] {
+                            beforeAnswering[command]?()
+                            reply = Array((untagged + "\(words[0]) OK \(words[1]) completed\r\n").utf8)
+                        }
+                        else {
+                            continue
+                        }
                         _ = reply.withUnsafeBufferPointer { send(accepted, $0.baseAddress!, $0.count, 0) }
+                        if refusedAndClosed {
+                            break
+                        }
                     }
                 }
                 Darwin.close(accepted)

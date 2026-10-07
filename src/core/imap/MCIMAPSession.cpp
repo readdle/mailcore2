@@ -969,6 +969,12 @@ void IMAPSession::login(ErrorCode * pError)
     if (r == MAILIMAP_ERROR_STREAM) {
         mShouldDisconnect = true;
         * pError = ErrorConnection;
+        // Yahoo and AOL refuse a session over their limit with `* BYE` and then `NO [LIMIT]`:
+        // libetpan stops at the BYE, and the tagged refusal stays in the stream buffer.
+        if (mImap->imap_stream_buffer != NULL && mImap->imap_stream_buffer->str != NULL &&
+            strstr(mImap->imap_stream_buffer->str, " NO [LIMIT]") != NULL) {
+            * pError = ErrorIMAPTooManySimultaneousConnections;
+        }
         return;
     }
     else if (r == MAILIMAP_ERROR_PARSE) {

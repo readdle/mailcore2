@@ -261,6 +261,7 @@ extern "C" {
         ErrorOutlookLoginViaWebBrowser,
         ErrorTiscaliSimplePassword,
         ErrorCanceled,
+        ErrorIMAPTooManySimultaneousConnections,
     }ErrorCode;
     
     typedef enum {

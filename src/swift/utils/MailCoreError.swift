@@ -65,6 +65,7 @@ public class MailCoreErrors: NSObjectCompat {
     case errorOutlookLoginViaWebBrowser
     case errorTiscaliSimplePassword
     case errorCanceled
+    case errorIMAPTooManySimultaneousConnections
     
     internal static func error(code: ErrorCode, userInfo: [String: Any]? = nil) -> NSError {
         return NSError(domain: MailCoreErrorDomain, code: Int(code.rawValue), userInfo: userInfo)
