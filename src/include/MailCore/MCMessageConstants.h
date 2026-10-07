@@ -260,6 +260,7 @@ namespace mailcore {
         ErrorOutlookLoginViaWebBrowser,
         ErrorTiscaliSimplePassword,
         ErrorCanceled,
+        ErrorIMAPTooManySimultaneousConnections,
     };
     
     enum PartType {
