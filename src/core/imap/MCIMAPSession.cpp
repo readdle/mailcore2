@@ -1001,6 +1001,8 @@ void IMAPSession::login(ErrorCode * pError)
         // The RFC 5530 response code, which `response` does not carry: libetpan keeps it apart.
         if (r == MAILIMAP_ERROR_LOGIN && mImap->imap_response_info != NULL && mImap->imap_response_info->rsp_atom != NULL &&
             strcasecmp(mImap->imap_response_info->rsp_atom, "LIMIT") == 0) {
+            // Dropped like the refusal after a BYE, so the next login reads no stale reply.
+            mShouldDisconnect = true;
             * pError = ErrorIMAPTooManySimultaneousConnections;
         }
         else if (response->locationOfString(MCSTR("not enabled for IMAP use")) != -1) {
