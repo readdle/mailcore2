@@ -2,7 +2,7 @@
 
 #define MCDEFINES_H_
 
-#if defined(__APPLE__) || defined(__ANDROID__) || defined(_MSC_VER)
+#if defined(__APPLE__) || defined(__ANDROID__) || defined(__linux__) || defined(_MSC_VER)
 #define MC_HAS_GCD 1
 #else
 #define MC_HAS_GCD 0

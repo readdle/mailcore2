@@ -132,7 +132,7 @@ var mailcoreExcludes = [
     "utils/RSMLibetpanHelper.mm",
 ]
 
-#if TARGET_ANDROID
+#if TARGET_ANDROID || TARGET_LINUX
 
 CMailCoreExcludes += [
     "core/basetypes/MCMainThreadMac.mm",
@@ -179,7 +179,8 @@ let dependencies: [Package.Dependency] = [
     .package(name: "libetpan", url: "https://github.com/readdle/libetpan.git", .branch("feature/CLI-267-linux-support-for-sparkly-and-its-dependencies")),
     .package(name: "tidy-html5", url: "https://github.com/readdle/tidy-html5.git", .exact("5.4.0-readdle.29")),
     .package(name: "ctemplate", url: "https://github.com/readdle/ctemplate.git", .branch("feature/CLI-267-linux-support-for-sparkly-and-its-dependencies")),
-    .package(name: "unicode", url: "https://github.com/readdle/swift-unicode", .branch("feature/CLI-267-linux-support-for-sparkly-and-its-dependencies"))
+    .package(name: "unicode", url: "https://github.com/readdle/swift-unicode", .branch("feature/CLI-267-linux-support-for-sparkly-and-its-dependencies")),
+    .package(name: "libxml", url: "https://github.com/readdle/swift-libxml.git", .branch("libxml2-unix"))
 ]
 
 var targets: [Target] = [
@@ -189,7 +190,8 @@ var targets: [Target] = [
             .product(name: "etpan", package: "libetpan"),
             .product(name: "RDHtml5Tidy", package: "tidy-html5"),
             .product(name: "ctemplate", package: "ctemplate"),
-            .product(name: "unicode", package: "unicode", condition: .when(platforms: [.iOS, .macOS])),
+            .product(name: "unicode", package: "unicode", condition: .when(platforms: [.iOS, .macOS, .linux])),
+            .product(name: "libxml", package: "libxml", condition: .when(platforms: [.linux])),
         ],
         path: "src",
         exclude: [
@@ -230,14 +232,16 @@ var targets: [Target] = [
             .headerSearchPath("c/utils"),
             .headerSearchPath("objc/utils"),
             .define("ANDROID", .when(platforms: [.android])),
-            .define("UCHAR_TYPE", to: "uint16_t", .when(platforms: [.macOS, .iOS])),
-            .unsafeFlags(["-fsigned-char"], .when(platforms: [.android])),
+            .define("UCHAR_TYPE", to: "uint16_t", .when(platforms: [.macOS, .iOS, .linux])),
+            .unsafeFlags(["-fsigned-char"], .when(platforms: [.android, .linux])),
+            // The libdispatch headers ship with the Swift toolchain, outside the C include path
+            .unsafeFlags(["-I/usr/lib/swift"], .when(platforms: [.linux])),
             .unsafeFlags(["-fno-objc-arc"], .when(platforms: [.macOS, .iOS]))
         ],
         linkerSettings: [
             .linkedLibrary("z"),
             .linkedLibrary("xml2"),
-            .linkedLibrary("resolv", .when(platforms: [.iOS, .macOS])),
+            .linkedLibrary("resolv", .when(platforms: [.iOS, .macOS, .linux])),
             .linkedLibrary("log", .when(platforms: [.android])),
             .linkedLibrary("_FoundationICU", .when(platforms: [.android]))
         ]
