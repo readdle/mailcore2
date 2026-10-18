@@ -84,6 +84,29 @@ jobs:
         GH_TOKEN: ${{ github.token }}
       run: ./build-windows-5.10/Check-PrebuiltPublished.ps1
 
+  Linux:
+    name: "mailcore2 - Linux"
+    runs-on: [self-hosted, Linux, sparkbackend-dev]
+    timeout-minutes: 60
+
+    defaults:
+      run:
+        shell: bash -l {0}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    - name: Run tests
+      run: ./build-scripts/test-linux.sh
+    - name: Publish Report
+      uses: mikepenz/action-junit-report@v3
+      if: failure()
+      with:
+        report_paths: .build/reports/junit.xml
+        check_name: mailcore2 - Linux - Report
+        detailed_summary: true
+        include_passed: true
+
   Darwin:
     name: "mailcore2 - ${{ matrix.os }}"
     runs-on: macos-latest
