@@ -99,15 +99,23 @@ final class IMAPLoginTests: XCTestCase {
 
     // MARK: - Login refusals
 
-    private enum LoginCommand: String {
+    /// One per libetpan login path: LOGIN, XOAUTH2 and the SASL exchange (PLAIN answers in the
+    /// command, LOGIN waits for the server's prompts). The server refuses them all the same way.
+    private enum LoginCommand: String, CaseIterable {
         case login = "LOGIN"
         case xoAuth2 = "AUTHENTICATE"
+        case saslPlain = "AUTHENTICATE PLAIN"
+        case saslLogin = "AUTHENTICATE LOGIN"
+
+        var refusedCommand: String {
+            return rawValue.components(separatedBy: " ")[0]
+        }
     }
 
     /// The error a login gets when the server answers it with `refusal`.
     private func loginError(refusedWith refusal: LeaseTestTCPEndpoint.Refusal, command: LoginCommand) throws -> NSError? {
         let endpoint = try LeaseTestTCPEndpoint(greeting: "* OK [CAPABILITY IMAP4rev1 AUTH=PLAIN AUTH=XOAUTH2] LeaseTestTCPEndpoint ready\r\n",
-                                                refusals: [command.rawValue: refusal])
+                                                refusals: [command.refusedCommand: refusal])
         defer { endpoint.stop() }
 
         let session = MCOIMAPSession()
@@ -121,6 +129,12 @@ final class IMAPLoginTests: XCTestCase {
         case .xoAuth2:
             session.authType = .XOAuth2
             session.OAuth2Token = "token"
+        case .saslPlain:
+            session.authType = .SASLPlain
+            session.password = "password"
+        case .saslLogin:
+            session.authType = .SASLLogin
+            session.password = "password"
         }
         session.timeout = 10
         session.maximumConnections = 1
@@ -139,7 +153,7 @@ final class IMAPLoginTests: XCTestCase {
 
     private func assertLogin(refusedWith refusal: LeaseTestTCPEndpoint.Refusal, failsWith code: MailCoreError,
                              file: StaticString = #filePath, line: UInt = #line) throws {
-        for command in [LoginCommand.login, .xoAuth2] {
+        for command in LoginCommand.allCases {
             let error = try loginError(refusedWith: refusal, command: command)
             XCTAssertEqual(error?.code, Int(code.rawValue), "\(command): \(String(describing: error))", file: file, line: line)
         }
@@ -155,6 +169,29 @@ final class IMAPLoginTests: XCTestCase {
 
     func testGmailTooManyConnectionsTextIsStillRecognized() throws {
         try assertLogin(refusedWith: .init(reply: { "\($0) NO [ALERT] Too many simultaneous connections. (Failure)\r\n" }, closesConnection: false),
+                        failsWith: .errorGmailTooManySimultaneousConnections)
+    }
+
+    /// `[UNAVAILABLE]` is a temporary failure on the server's side; reported as an authentication
+    /// error it made the client refresh its token and drop its connections on every attempt.
+    func testUnavailableIsATemporaryServerFailure() throws {
+        try assertLogin(refusedWith: .init(reply: { "\($0) NO [UNAVAILABLE] AUTHENTICATE Server error - Please try again later\r\n" },
+                                           closesConnection: false),
+                        failsWith: .errorIMAPUnavailable)
+    }
+
+    /// iCloud answers with BAD instead of NO; the code means the same.
+    func testUnavailableOnBadIsTheSameTemporaryFailure() throws {
+        try assertLogin(refusedWith: .init(reply: { "\($0) BAD [UNAVAILABLE] Service temporarily unavailable\r\n" },
+                                           closesConnection: false),
+                        failsWith: .errorIMAPUnavailable)
+    }
+
+    /// A refusal over the connection limit that also carries the code stays the limit: the more
+    /// specific answer, with the pool narrowing it calls for.
+    func testUnavailableWithConnectionLimitTextStaysTooManyConnections() throws {
+        try assertLogin(refusedWith: .init(reply: { "\($0) NO [UNAVAILABLE] Maximum number of connections from user+IP exceeded\r\n" },
+                                           closesConnection: false),
                         failsWith: .errorGmailTooManySimultaneousConnections)
     }
 

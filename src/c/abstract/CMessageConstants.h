@@ -262,6 +262,7 @@ extern "C" {
         ErrorTiscaliSimplePassword,
         ErrorCanceled,
         ErrorIMAPTooManySimultaneousConnections,
+        ErrorIMAPUnavailable,
     }ErrorCode;
     
     typedef enum {
