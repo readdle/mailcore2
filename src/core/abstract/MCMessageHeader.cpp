@@ -777,6 +777,13 @@ static Array * imap_mailbox_list_to_address_array(clist * imap_mailbox_list)
         Address * address;
         
         imap_addr = (struct mailimap_address *) clist_content(cur);
+        // A NIL host name marks a group: its start when the mailbox name holds the group name,
+        // its end when that is NIL too (RFC 3501 7.4.2). A marker is not an address; a group
+        // contributes only its members, as it does when parsed from RFC 822 headers. Some
+        // servers (Strato) send a lone end marker, ((NIL NIL NIL NIL)), for an empty field.
+        if (imap_addr->ad_host_name == NULL) {
+            continue;
+        }
         address = Address::addressWithIMAPAddress(imap_addr);
         result->addObject(address);
     }
@@ -855,7 +862,9 @@ void MessageHeader::importIMAPEnvelope(struct mailimap_envelope * env)
             Array * addresses;
 
             addresses = imap_mailbox_list_to_address_array(env->env_reply_to->rt_list);
-            setReplyTo(addresses);
+            if (addresses->count() > 0) {
+                setReplyTo(addresses);
+            }
         }
     }
 
@@ -864,7 +873,9 @@ void MessageHeader::importIMAPEnvelope(struct mailimap_envelope * env)
             Array * addresses;
 
             addresses = imap_mailbox_list_to_address_array(env->env_to->to_list);
-            setTo(addresses);
+            if (addresses->count() > 0) {
+                setTo(addresses);
+            }
         }
     }
 
@@ -873,7 +884,9 @@ void MessageHeader::importIMAPEnvelope(struct mailimap_envelope * env)
             Array * addresses;
 
             addresses = imap_mailbox_list_to_address_array(env->env_cc->cc_list);
-            setCc(addresses);
+            if (addresses->count() > 0) {
+                setCc(addresses);
+            }
         }
     }
 
@@ -882,7 +895,9 @@ void MessageHeader::importIMAPEnvelope(struct mailimap_envelope * env)
             Array * addresses;
 
             addresses = imap_mailbox_list_to_address_array(env->env_bcc->bcc_list);
-            setBcc(addresses);
+            if (addresses->count() > 0) {
+                setBcc(addresses);
+            }
         }
     }
 
