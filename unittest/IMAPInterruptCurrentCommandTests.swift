@@ -31,6 +31,13 @@ private func closeSocket(_ fileDescriptor: Int32) {
     _ = close(fileDescriptor)
 }
 
+/// `SOCK_STREAM` as `socket()` takes it: Glibc imports it as an enum, the others as `Int32`.
+#if canImport(Glibc)
+private let streamSocketType = Int32(SOCK_STREAM.rawValue)
+#else
+private let streamSocketType = SOCK_STREAM
+#endif
+
 /// A TCP endpoint that accepts connections and then says nothing at all. A client connected to it
 /// sits in its first read until the socket timeout expires - exactly the state that
 /// `interruptCurrentCommand()` has to break, and reproducible without an IMAP server.
@@ -47,7 +54,7 @@ private final class SilentTCPEndpoint {
     init() throws {
         // Everything below works on a local descriptor: a closure that touched `listeningSocket`
         // would capture self before `port` is initialized.
-        let fileDescriptor = socket(AF_INET, SOCK_STREAM, 0)
+        let fileDescriptor = socket(AF_INET, streamSocketType, 0)
         guard fileDescriptor >= 0 else {
             throw NSError(domain: "SilentTCPEndpoint", code: Int(errno), userInfo: nil)
         }
