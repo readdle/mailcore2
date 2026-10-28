@@ -549,6 +549,32 @@ String * Data::charsetWithFilteredHTML(bool filterHTML, String * hintCharset)
                     result = hintCharset;
                     break;
                 }
+                // ICU names its Latin-1 match windows-1252 when the text has bytes 0x80-0x9F.
+                if ((isHintWindowsCharset(hintCharset) ||
+                        isHintCyrillicCharset(hintCharset)) &&
+                        name->isEqual(MCSTR("windows-1252"))) {
+                    result = hintCharset;
+                    break;
+                }
+                // ISO-8859 text mixed with English: keep the declared charset.
+                if (hintCharset->hasPrefix(MCSTR("iso-8859-")) &&
+                        name->isEqual(MCSTR("iso-8859-1"))) {
+                    result = hintCharset;
+                    break;
+                }
+                // Latin-1 text with typographic quotes is windows-1252. Must precede the next rule.
+                if (hintCharset->isEqual(MCSTR("iso-8859-1")) &&
+                        name->isEqual(MCSTR("windows-1252"))) {
+                    result = name;
+                    break;
+                }
+                // ISO-8859 text with Windows typographic quotes: keep the declared charset.
+                // The quotes decode as C1 control characters.
+                if (hintCharset->hasPrefix(MCSTR("iso-8859-")) &&
+                        name->isEqual(MCSTR("windows-1252"))) {
+                    result = hintCharset;
+                    break;
+                }
                 maxConfidence = confidence;
                 result = name;
             }
