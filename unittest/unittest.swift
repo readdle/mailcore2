@@ -136,6 +136,8 @@ class unittest : XCTestCase {
     var _charsetDetectionPath: URL!
     var _summaryDetectionPath: URL!
     var _summaryDetectionOutputPath: URL!
+    var _charsetHintPath: URL!
+    var _charsetHintOutputPath: URL!
     
     override func setUp() {
         super.setUp()
@@ -159,6 +161,8 @@ class unittest : XCTestCase {
         _charsetDetectionPath = _mainPath.appendingPathComponent("charset-detection")
         _summaryDetectionPath = _mainPath.appendingPathComponent("summary/input")
         _summaryDetectionOutputPath = _mainPath.appendingPathComponent("summary/output")
+        _charsetHintPath = _mainPath.appendingPathComponent("charset-hint/input")
+        _charsetHintOutputPath = _mainPath.appendingPathComponent("charset-hint/output")
         
     }
     
@@ -286,6 +290,30 @@ class unittest : XCTestCase {
             let data = try! Data(contentsOf: path, options: [])
             let charset = data.mailCoreData().charsetWithFilteredHTML(false).string()!.lowercased()
             XCTAssertEqual(path.deletingPathExtension().lastPathComponent, charset, "not equal");
+        }
+    }
+    
+    func testCharsetHint() {
+        let list = try! FileManager.default.subpathsOfDirectory(atPath: _charsetHintPath.path)
+        for name in list {
+            let path = _charsetHintPath.appendingPathComponent(name)
+            var isDirectory = false
+            FileManager.default.fileExists(atPath: path.path , isDirectory: &isDirectory)
+            if isDirectory {
+                continue
+            }
+            if path.lastPathComponent.starts(with: ".") { // Hidden files
+                continue
+            }
+            
+            let parser = MCOMessageParser(data: try! Data(contentsOf: path, options: []))
+            for part in (parser.mainPart() as! MCOAbstractMultipart).parts! {
+                let text = part.decodedStringForData(data: MCOAbstractPart.getData(part)!)
+                let resultPath = _charsetHintOutputPath.appendingPathComponent(name).deletingPathExtension()
+                    .appendingPathExtension(part.mimeType == "text/html" ? "html" : "txt")
+                let resultString = try! String(contentsOf: resultPath, encoding: .utf8)
+                XCTAssertEqual(text, resultString, "\(name) \(part.mimeType!)")
+            }
         }
     }
     
