@@ -1,0 +1,53 @@
+Content-Type: multipart/alternative;
+ boundary="===============8702260168518013247=="
+MIME-Version: 1.0
+From: Customer Service <support@example.com>
+To: tester@example.com
+Subject: Automatic reply: English with typographic quotes (koi8-r)
+Date: Wed, 28 Oct 2026 10:00:00 +0200
+Message-ID: <english-koi8-r-quotes-repro@example.com>
+
+--===============8702260168518013247==
+Content-Type: text/plain; charset="koi8-r"
+MIME-Version: 1.0
+Content-Transfer-Encoding: quoted-printable
+
+=93Thank you for contacting us.=94
+Your request has been received and will be reviewed in order of priority =
+=96 usually within two business days.
+To ensure faster service, we kindly ask that you send only one message rega=
+rding your request and avoid sending multiple reminders, as these may cause=
+ delays both in addressing your request and in processing requests from oth=
+er customers.
+We thank you in advance for your understanding and cooperation.
+Sincerely,
+Customer Service Department
+
+This email and any files transmitted with it are confidential and intended =
+solely for the use of the individual or entity to whom they are addressed. =
+If you are not the named addressee, dissemination, distribution or copying =
+of this e-mail is strictly prohibited.
+
+--===============8702260168518013247==
+Content-Type: text/html; charset="koi8-r"
+MIME-Version: 1.0
+Content-Transfer-Encoding: quoted-printable
+
+<html><head><meta http-equiv=3D"Content-Type" content=3D"text/html; charset=
+=3Dkoi8-r"></head><body>
+<p>=93Thank you for contacting us.=94</p>
+<p>Your request has been received and will be reviewed in order of priority=
+ =96 usually within two business days.</p>
+<p>To ensure faster service, we kindly ask that you send only one message r=
+egarding your request and avoid sending multiple reminders, as these may ca=
+use delays both in addressing your request and in processing requests from =
+other customers.</p>
+<p>We thank you in advance for your understanding and cooperation.</p>
+<p>Sincerely,</p>
+<p>Customer Service Department</p>
+<p style=3D"color:red;font-size:7pt">This email and any files transmitted w=
+ith it are confidential and intended solely for the use of the individual o=
+r entity to whom they are addressed. If you are not the named addressee, di=
+ssemination, distribution or copying of this e-mail is strictly prohibited.
+</p></body></html>
+--===============8702260168518013247==--
