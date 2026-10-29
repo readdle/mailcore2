@@ -882,7 +882,7 @@ static int lepMixedConv(const char * tocode, const char * fromcode,
 }
 #endif
 
-#if __APPLE__ || defined(__ANDROID__) || defined(ANDROID) || defined(_WIN32)  || defined(_WIN64)
+#if __APPLE__ || defined(__ANDROID__) || defined(ANDROID) || defined(__linux__) || defined(_WIN32)  || defined(_WIN64)
 
 static int lepMixedConv(const char * tocode, const char * fromcode,
                         const char * str, size_t length,
@@ -918,7 +918,7 @@ static void * createObject()
 INITIALIZE(Data)
 {
     Object::registerObjectConstructor("mailcore::Data", &createObject);
-#if __APPLE__ || defined(__ANDROID__) || defined(ANDROID) || defined(_WIN32)  || defined(_WIN64)
+#if __APPLE__ || defined(__ANDROID__) || defined(ANDROID) || defined(__linux__) || defined(_WIN32)  || defined(_WIN64)
     extended_charconv = lepMixedConv;
 #endif
 }
