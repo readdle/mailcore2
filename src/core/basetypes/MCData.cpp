@@ -549,6 +549,12 @@ String * Data::charsetWithFilteredHTML(bool filterHTML, String * hintCharset)
                     result = hintCharset;
                     break;
                 }
+                // ISO-8859 text mixed with English: keep the declared charset.
+                if (hintCharset->hasPrefix(MCSTR("iso-8859-")) &&
+                        name->isEqual(MCSTR("iso-8859-1"))) {
+                    result = hintCharset;
+                    break;
+                }
                 maxConfidence = confidence;
                 result = name;
             }

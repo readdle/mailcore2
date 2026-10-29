@@ -585,6 +585,17 @@ static bool hasError(int errorCode)
             (errorCode != MAILIMAP_NO_ERROR_NON_AUTHENTICATED));
 }
 
+// Whether the reply libetpan last parsed carries the RFC 5530 response code `code`. libetpan
+// rebuilds the field on every parsed reply (response_store) and every connect starts from a fresh
+// mailimap, so after a login error it holds this login's code - or, when the error came before any
+// reply was parsed (a SASL step failing), the code of a pre-login reply on the same connection,
+// which no server marks UNAVAILABLE.
+static bool parsedReplyHasCode(mailimap * imap, const char * code)
+{
+    return imap->imap_response_info != NULL && imap->imap_response_info->rsp_atom != NULL &&
+        strcasecmp(imap->imap_response_info->rsp_atom, code) == 0;
+}
+
 bool IMAPSession::checkCertificate()
 {
     if (!isCheckCertificateEnabled())
@@ -1011,6 +1022,15 @@ void IMAPSession::login(ErrorCode * pError)
         }
         else if (response->locationOfString(MCSTR("Maximum number of connections")) != -1) {
             * pError = ErrorGmailTooManySimultaneousConnections;
+        }
+        // The RFC 5530 code names a temporary failure on the server's side whatever the wording
+        // (Yahoo answers `NO [UNAVAILABLE]`, iCloud `BAD [UNAVAILABLE]`); the credentials are not
+        // in question. After the connection-limit texts, which a server may mark with the same
+        // code: the limit is the more specific answer. The connection is dropped so that the next
+        // login starts on a clean one.
+        else if ((r == MAILIMAP_ERROR_LOGIN || r == MAILIMAP_ERROR_PROTOCOL) && parsedReplyHasCode(mImap, "UNAVAILABLE")) {
+            mShouldDisconnect = true;
+            * pError = ErrorIMAPUnavailable;
         }
         else if (response->locationOfString(MCSTR("Application-specific password required")) != -1) {
             * pError = ErrorGmailApplicationSpecificPasswordRequired;

@@ -261,6 +261,7 @@ namespace mailcore {
         ErrorTiscaliSimplePassword,
         ErrorCanceled,
         ErrorIMAPTooManySimultaneousConnections,
+        ErrorIMAPUnavailable,
     };
     
     enum PartType {

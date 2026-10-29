@@ -764,6 +764,21 @@ extern "C" {
 
 #pragma mark IMAP mailbox conversion
 
+static bool imap_address_is_group_end(struct mailimap_address * imap_addr)
+{
+    return imap_addr->ad_host_name == NULL && imap_addr->ad_mailbox_name == NULL;
+}
+
+static bool imap_address_list_has_group_end(clistiter * cur)
+{
+    for(; cur != NULL ; cur = clist_next(cur)) {
+        if (imap_address_is_group_end((struct mailimap_address *) clist_content(cur))) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static Array * imap_mailbox_list_to_address_array(clist * imap_mailbox_list)
 {
     clistiter * cur;
@@ -777,6 +792,19 @@ static Array * imap_mailbox_list_to_address_array(clist * imap_mailbox_list)
         Address * address;
         
         imap_addr = (struct mailimap_address *) clist_content(cur);
+        // Group markers carry a NIL host name (RFC 3501 7.4.2) and are not addresses: a group
+        // contributes only its members, as it does when parsed from RFC 822 headers. Some
+        // servers (Strato) send a lone end marker, ((NIL NIL NIL NIL)), for an empty field.
+        // A NIL host name with a mailbox name is a group start only when an end marker
+        // follows; otherwise it is an address without a domain. An ENVELOPE cannot tell a
+        // start from a domain-less address that precedes or sits in a group, and such an
+        // entry is dropped so that a group name never becomes a recipient.
+        if (imap_address_is_group_end(imap_addr)) {
+            continue;
+        }
+        if (imap_addr->ad_host_name == NULL && imap_address_list_has_group_end(clist_next(cur))) {
+            continue;
+        }
         address = Address::addressWithIMAPAddress(imap_addr);
         result->addObject(address);
     }
@@ -855,7 +883,9 @@ void MessageHeader::importIMAPEnvelope(struct mailimap_envelope * env)
             Array * addresses;
 
             addresses = imap_mailbox_list_to_address_array(env->env_reply_to->rt_list);
-            setReplyTo(addresses);
+            if (addresses->count() > 0) {
+                setReplyTo(addresses);
+            }
         }
     }
 
@@ -864,7 +894,9 @@ void MessageHeader::importIMAPEnvelope(struct mailimap_envelope * env)
             Array * addresses;
 
             addresses = imap_mailbox_list_to_address_array(env->env_to->to_list);
-            setTo(addresses);
+            if (addresses->count() > 0) {
+                setTo(addresses);
+            }
         }
     }
 
@@ -873,7 +905,9 @@ void MessageHeader::importIMAPEnvelope(struct mailimap_envelope * env)
             Array * addresses;
 
             addresses = imap_mailbox_list_to_address_array(env->env_cc->cc_list);
-            setCc(addresses);
+            if (addresses->count() > 0) {
+                setCc(addresses);
+            }
         }
     }
 
@@ -882,7 +916,9 @@ void MessageHeader::importIMAPEnvelope(struct mailimap_envelope * env)
             Array * addresses;
 
             addresses = imap_mailbox_list_to_address_array(env->env_bcc->bcc_list);
-            setBcc(addresses);
+            if (addresses->count() > 0) {
+                setBcc(addresses);
+            }
         }
     }
 
