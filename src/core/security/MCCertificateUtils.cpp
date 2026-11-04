@@ -173,6 +173,104 @@ free_certs:
     CFRelease(policy);
     CFRelease(hostnameCFString);
     return result;
+#elif defined(_MSC_VER)
+    // COR-316: verify with the Windows chain engine, as SecTrust does on Apple platforms. Only the
+    // chain engine fetches a trusted root Windows has not downloaded yet (automatic root update).
+    bool result = false;
+    HCERTSTORE store = NULL;
+    PCCERT_CONTEXT leaf = NULL;
+    PCCERT_CHAIN_CONTEXT chain = NULL;
+
+    if (carray_count(cCerts) == 0) {
+        MCLog("MCCertificateUtils error: no certificate to verify");
+        return false;
+    }
+    store = CertOpenStore(CERT_STORE_PROV_MEMORY, 0, 0, 0, NULL);
+    if (store == NULL) {
+        MCLog("MCCertificateUtils error: can't create a certificate store");
+        return false;
+    }
+
+    for(unsigned int i = 0 ; i < carray_count(cCerts) ; i ++) {
+        MMAPString * str = (MMAPString *) carray_get(cCerts, i);
+        if (!CertAddEncodedCertificateToStore(store, X509_ASN_ENCODING, (const BYTE *) str->str, (DWORD) str->len,
+                                              CERT_STORE_ADD_USE_EXISTING, i == 0 ? &leaf : NULL)) {
+            MCLog("MCCertificateUtils error: certificate %u is not a valid DER certificate", i);
+            goto free_certs;
+        }
+    }
+
+    if (cTrustAnchors != NULL) {
+        // Tests: trust these roots in addition to the system store. The server may have sent them too.
+        for(unsigned int i = 0 ; i < carray_count(cTrustAnchors) ; i ++) {
+            MMAPString * str = (MMAPString *) carray_get(cTrustAnchors, i);
+            CertAddEncodedCertificateToStore(store, X509_ASN_ENCODING, (const BYTE *) str->str, (DWORD) str->len,
+                                             CERT_STORE_ADD_USE_EXISTING, NULL);
+        }
+    }
+
+    {
+        LPSTR serverAuth = (LPSTR) szOID_PKIX_KP_SERVER_AUTH;
+        CERT_CHAIN_PARA chainPara = {};
+        chainPara.cbSize = sizeof(chainPara);
+        chainPara.RequestedUsage.dwType = USAGE_MATCH_TYPE_AND;
+        chainPara.RequestedUsage.Usage.cUsageIdentifier = 1;
+        chainPara.RequestedUsage.Usage.rgpszUsageIdentifier = &serverAuth;
+        FILETIME fileTime;
+        if (verifyTime != 0) {
+            // Tests: evaluate validity at a fixed point in time. FILETIME counts 100 ns since 1601.
+            ULONGLONG ticks = ((ULONGLONG) verifyTime + 11644473600ULL) * 10000000ULL;
+            fileTime.dwLowDateTime = (DWORD) ticks;
+            fileTime.dwHighDateTime = (DWORD) (ticks >> 32);
+        }
+        if (!CertGetCertificateChain(NULL, leaf, verifyTime != 0 ? &fileTime : NULL, store, &chainPara, 0, NULL, &chain)) {
+            MCLog("MCCertificateUtils error: CertGetCertificateChain failed 0x%08lx", GetLastError());
+            goto free_certs;
+        }
+    }
+
+    {
+        SSL_EXTRA_CERT_CHAIN_POLICY_PARA sslPara = {};
+        sslPara.cbSize = sizeof(sslPara);
+        sslPara.dwAuthType = AUTHTYPE_SERVER;
+        sslPara.pwszServerName = (WCHAR *) hostname->unicodeCharacters();
+        CERT_CHAIN_POLICY_PARA policyPara = {};
+        policyPara.cbSize = sizeof(policyPara);
+        policyPara.pvExtraPolicyPara = &sslPara;
+        if (cTrustAnchors != NULL) {
+            // Tests: no system store holds the anchors, so a chain ending in one has an unknown CA.
+            PCERT_SIMPLE_CHAIN simpleChain = chain->rgpChain[chain->cChain - 1];
+            PCCERT_CONTEXT root = simpleChain->rgpElement[simpleChain->cElement - 1]->pCertContext;
+            for(unsigned int i = 0 ; i < carray_count(cTrustAnchors) ; i ++) {
+                MMAPString * str = (MMAPString *) carray_get(cTrustAnchors, i);
+                if (str->len == root->cbCertEncoded && memcmp(str->str, root->pbCertEncoded, str->len) == 0) {
+                    policyPara.dwFlags = CERT_CHAIN_POLICY_ALLOW_UNKNOWN_CA_FLAG;
+                }
+            }
+        }
+        CERT_CHAIN_POLICY_STATUS policyStatus = {};
+        policyStatus.cbSize = sizeof(policyStatus);
+        if (!CertVerifyCertificateChainPolicy(CERT_CHAIN_POLICY_SSL, chain, &policyPara, &policyStatus)) {
+            MCLog("MCCertificateUtils error: CertVerifyCertificateChainPolicy failed 0x%08lx", GetLastError());
+        }
+        else if (policyStatus.dwError == 0) {
+            result = true;
+        }
+        else {
+            MCLog("MCCertificateUtils error: certificate policy error 0x%08lx (chain status 0x%08lx)",
+                  policyStatus.dwError, chain->TrustStatus.dwErrorStatus);
+        }
+    }
+
+free_certs:
+    if (chain != NULL) {
+        CertFreeCertificateChain(chain);
+    }
+    if (leaf != NULL) {
+        CertFreeCertificateContext(leaf);
+    }
+    CertCloseStore(store, 0);
+    return result;
 #else
     bool result = false;
     X509_STORE * store = NULL;
@@ -190,24 +288,7 @@ free_certs:
         goto free_certs;
     }
     
-#ifdef _MSC_VER
-	HCERTSTORE systemStore = CertOpenSystemStore(NULL, L"ROOT");
-
-	PCCERT_CONTEXT previousCert = NULL;
-	while (1) {
-		PCCERT_CONTEXT nextCert = CertEnumCertificatesInStore(systemStore, previousCert);
-		if (nextCert == NULL) {
-			break;
-		}
-		X509 * openSSLCert = d2i_X509(NULL, (const unsigned char **)&nextCert->pbCertEncoded, nextCert->cbCertEncoded);
-		if (openSSLCert != NULL) {
-			X509_STORE_add_cert(store, openSSLCert);
-			X509_free(openSSLCert);
-		}
-		previousCert = nextCert;
-	}
-	CertCloseStore(systemStore, 0);
-#elif defined(ANDROID) || defined(__ANDROID__)
+#if defined(ANDROID) || defined(__ANDROID__)
     dir = opendir("/system/etc/security/cacerts");
     while ((ent = readdir(dir))) {
         if (ent->d_name[0] == '.') {
