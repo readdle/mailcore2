@@ -17,7 +17,7 @@
 #include <pthread.h>
 #endif
 
-#if defined(__ANDROID__)
+#if defined(__ANDROID__) || defined(__linux__)
 #if __cplusplus
 extern "C" {
 #endif
@@ -79,7 +79,7 @@ namespace mailcore {
         
         typedef void (Object::*Method) (void *);
         virtual void performMethod(Method method, void * context);
-#if !defined(__ANDROID__)
+#if !defined(__ANDROID__) && !defined(__linux__)
         virtual void performMethodOnMainThread(Method method, void * context, bool waitUntilDone = false);
 #endif
         virtual void performMethodAfterDelay(Method method, void * context, double delay);
