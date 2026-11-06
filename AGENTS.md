@@ -4,6 +4,20 @@ This is Readdle's fork of MailCore 2. Most of it is the upstream C++ library; th
 maintain are the C wrapper (`src/c`), the Swift bindings (`src/swift`) and the Windows build
 under `build-windows-5.10`.
 
+## Changing the library
+
+Several clients build against this fork, and it is merged with upstream regularly. A change
+therefore extends the library and never changes its default behavior:
+
+- **Check upstream first.** If upstream has the fix, take its commit.
+- **Add beside, do not replace.** A new call or option; a client that does not use it sees the
+  library as before, and removing the call rolls the change back. `interruptCurrentCommand`
+  beside `cancel` is the shape.
+- **Keep the diff pointed.** No refactoring, moves, reformatting or new layers in upstream code;
+  the limit does not apply to tests.
+- **Keep heuristics out.** A rule over one server's replies is either a per-server error such as
+  `ErrorGmailTooManySimultaneousConnections` or logic in the client.
+
 ## Publishing the Windows prebuilt
 
 Spark's Windows build does not compile the mailcore2 C++ from source. It downloads an archive
