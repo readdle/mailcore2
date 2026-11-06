@@ -145,6 +145,16 @@ public class MCOIMAPSession: NSObjectCompat {
     }
 
     /**
+     The identity the client sends with the IMAP ID command. Set its fields before the first
+     command: a connection copies it when it is created.
+     */
+    public var clientIdentity: MCOIMAPIdentity {
+        return mailCoreAutoreleasePool {
+            MCOIMAPIdentity(mailCoreObject: session.clientIdentity.toCObject())
+        }
+    }
+
+    /**
      How long an idle connection stays open once its work is done, in seconds. Settable from any
      thread at any time: an idle timer already running starts over with the new delay.
      */
