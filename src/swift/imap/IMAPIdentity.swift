@@ -77,7 +77,7 @@ public class MCOIMAPIdentity: Convertible {
             return nativeInstance.infoForKey(key.mailCoreString()).string()
         }
     }
-
+    
     /** Set a custom field in the identity */
     public func setInfo(_ value: String, forKey key: String) {
         mailCoreAutoreleasePool {
