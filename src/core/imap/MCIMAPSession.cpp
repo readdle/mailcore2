@@ -384,6 +384,7 @@ void IMAPSession::init()
     mConnectionType = ConnectionTypeClear;
     mCheckCertificateEnabled = true;
     mVoIPEnabled = true;
+    mLogoutOnDisconnectEnabled = false;
     mLastLoginTime = 0;
     mQResyncCompatible = true;
     mDelimiter = 0;
@@ -557,6 +558,16 @@ void IMAPSession::setVoIPEnabled(bool enabled)
 bool IMAPSession::isVoIPEnabled()
 {
     return mVoIPEnabled;
+}
+
+void IMAPSession::setLogoutOnDisconnectEnabled(bool enabled)
+{
+    mLogoutOnDisconnectEnabled = enabled;
+}
+
+bool IMAPSession::isLogoutOnDisconnectEnabled()
+{
+    return mLogoutOnDisconnectEnabled;
 }
 
 void IMAPSession::setQResyncCompatible(bool compatible)
@@ -3803,6 +3814,30 @@ void IMAPSession::unsetupIdle()
 
 void IMAPSession::disconnect()
 {
+    // The connection is dropped whatever the server answers, so the reply is not read: waiting would
+    // cost a round trip, and the whole timeout on a socket that went half-open. Not during IDLE,
+    // where LOGOUT is not a valid command.
+    if (mLogoutOnDisconnectEnabled) {
+        mailimap * imap = NULL;
+        LOCK();
+        if (mImap != NULL && mImap->imap_stream != NULL && !mIdleInProgress && !mShouldDisconnect &&
+            !mStreamCancelled && (mState == STATE_LOGGEDIN || mState == STATE_SELECTED)) {
+            imap = mImap;
+        }
+        UNLOCK();
+        if (imap != NULL) {
+            // mailimap_send_current_tag() would do the tag, but libetpan does not export it, so
+            // the Windows DLL build could not link it.
+            char command[32];
+            imap->imap_tag ++;
+            int length = snprintf(command, sizeof(command),
+                                  mailimap_is_163_workaround_enabled(imap) ? "C%i LOGOUT\r\n" : "%i LOGOUT\r\n",
+                                  imap->imap_tag);
+            if (mailstream_write(imap->imap_stream, command, length) == length) {
+                mailstream_flush(imap->imap_stream);
+            }
+        }
+    }
     unsetup();
 }
 

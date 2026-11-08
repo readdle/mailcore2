@@ -32,6 +32,7 @@ C_SYNTHESIZE_MAILCORE_OBJ(CIMAPIdentity, CIMAPIdentity_new, setClientIdentity, c
 C_SYNTHESIZE_SCALAR(dispatch_queue_t, dispatch_queue_t, setDispatchQueue, dispatchQueue)
 C_SYNTHESIZE_BOOL(setQResyncCompatible, isQResyncCompatible)
 C_SYNTHESIZE_BOOL(setVoIPEnabled, isVoIPEnabled)
+C_SYNTHESIZE_BOOL(setLogoutOnDisconnectEnabled, isLogoutOnDisconnectEnabled)
 
 class CIMAPCallbackBridge : public mailcore::Object, public mailcore::ConnectionLogger, public mailcore::OperationQueueCallback {
 public:

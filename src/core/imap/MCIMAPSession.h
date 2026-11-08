@@ -273,6 +273,10 @@ namespace mailcore {
         // between two operations, when no command is on the wire: a cut that landed with no read
         // in flight failed nothing, and this is where it gets its reconnect. Declared last.
         virtual void scheduleReconnectIfInterrupted();
+        // When enabled, disconnect() sends LOGOUT on a logged-in connection before closing it,
+        // without waiting for the reply. Off by default. Declared last, like needsReconnect().
+        virtual void setLogoutOnDisconnectEnabled(bool enabled);
+        virtual bool isLogoutOnDisconnectEnabled();
 
     private:
         String * mHostname;
@@ -345,6 +349,7 @@ namespace mailcore {
         String * mLoginResponse;
         String * mGmailUserDisplayName;
         Data * mUnparsedResponseData;
+        bool mLogoutOnDisconnectEnabled;
         
         void init();
         void bodyProgress(unsigned int current, unsigned int maximum);

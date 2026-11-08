@@ -271,6 +271,7 @@ namespace mailcore {
 #endif
         String * mGmailUserDisplayName;
         bool mIdleEnabled;
+        bool mLogoutOnDisconnectEnabled;
 
         /*! Create new IMAP session */
         virtual IMAPAsyncConnection * session();
@@ -293,6 +294,12 @@ namespace mailcore {
         virtual IMAPMessageRenderingOperation * renderingOperation(IMAPMessage * message,
                                                                    String * folder,
                                                                    IMAPMessageRenderingType type);
+
+    public:
+        // See IMAPSession::setLogoutOnDisconnectEnabled(). Applies to connections created after it
+        // is set. Declared last, like IMAPSession::needsReconnect().
+        virtual void setLogoutOnDisconnectEnabled(bool enabled);
+        virtual bool isLogoutOnDisconnectEnabled();
     };
     
 }
