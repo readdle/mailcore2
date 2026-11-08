@@ -2386,7 +2386,7 @@ static void msg_att_handler(struct mailimap_msg_att * msg_att, void * context)
             else if (att_static->att_type == MAILIMAP_MSG_ATT_ENVELOPE) {
                 struct mailimap_envelope * env;
                 
-                MCLog("parse envelope %lu", (unsigned long) uid);
+                MCLogVerbose("parse envelope %lu", (unsigned long) uid);
                 env = att_static->att_data.att_env;
                 msg->header()->importIMAPEnvelope(env);
                 hasHeader = true;
@@ -2581,13 +2581,13 @@ IMAPSyncResult * IMAPSession::fetchMessages(String * folder, IMAPMessagesRequest
     fetch_att = mailimap_fetch_att_new_uid();
     mailimap_fetch_type_new_fetch_att_list_add(fetch_type, fetch_att);
     if ((requestKind & IMAPMessagesRequestKindFlags) != 0) {
-        MCLog("request flags");
+        MCLogVerbose("request flags");
         fetch_att = mailimap_fetch_att_new_flags();
         mailimap_fetch_type_new_fetch_att_list_add(fetch_type, fetch_att);
         needsFlags = true;
     }
     if ((requestKind & IMAPMessagesRequestKindGmailLabels) != 0) {
-        MCLog("request flags");
+        MCLogVerbose("request flags");
         fetch_att = mailimap_fetch_att_new_xgmlabels();
         mailimap_fetch_type_new_fetch_att_list_add(fetch_type, fetch_att);
         needsGmailLabels = true;
@@ -2605,7 +2605,7 @@ IMAPSyncResult * IMAPSession::fetchMessages(String * folder, IMAPMessagesRequest
     if ((requestKind & IMAPMessagesRequestKindFullHeaders) != 0) {
         char * header;
         
-        MCLog("request envelope");
+        MCLogVerbose("request envelope");
         
         // most important header
         header = strdup("Date");
@@ -2632,7 +2632,7 @@ IMAPSyncResult * IMAPSession::fetchMessages(String * folder, IMAPMessagesRequest
     if ((requestKind & IMAPMessagesRequestKindHeaders) != 0) {
         char * header;
         
-        MCLog("request envelope");
+        MCLogVerbose("request envelope");
         // envelope
         fetch_att = mailimap_fetch_att_new_envelope();
         mailimap_fetch_type_new_fetch_att_list_add(fetch_type, fetch_att);
@@ -2647,14 +2647,14 @@ IMAPSyncResult * IMAPSession::fetchMessages(String * folder, IMAPMessagesRequest
     }
     if ((requestKind & IMAPMessagesRequestKindSize) != 0) {
         // message structure
-        MCLog("request size");
+        MCLogVerbose("request size");
         fetch_att = mailimap_fetch_att_new_rfc822_size();
         mailimap_fetch_type_new_fetch_att_list_add(fetch_type, fetch_att);
     }
     
     if ((requestKind & IMAPMessagesRequestKindStructure) != 0) {
         // message structure
-        MCLog("request bodystructure");
+        MCLogVerbose("request bodystructure");
         fetch_att = mailimap_fetch_att_new_bodystructure();
         mailimap_fetch_type_new_fetch_att_list_add(fetch_type, fetch_att);
         needsBody = true;

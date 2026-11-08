@@ -135,7 +135,7 @@ AbstractPart * IMAPPart::attachmentWithIMAPBody1Part(struct mailimap_body_type_1
             attachment = attachmentWithIMAPBody1PartText(body_1part->bd_data.bd_type_text,
                 body_1part->bd_ext_1part);
             attachment->setPartID(partID);
-            MCLog("attachment %s", MCUTF8(partID));
+            MCLogVerbose("attachment %s", MCUTF8(partID));
             return attachment;
         }
     }
