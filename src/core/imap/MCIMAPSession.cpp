@@ -834,7 +834,7 @@ void IMAPSession::connect(ErrorCode * pError)
     }
     
     * pError = ErrorNone;
-    MCLog("connect ok");
+    MCLogVerbose("connect ok");
     return;
     
 close:
@@ -874,7 +874,7 @@ void IMAPSession::login(ErrorCode * pError)
 {
     int r;
     
-    MCLog("login");
+    MCLogVerbose("login");
     
     MCAssert(mState == STATE_CONNECTED);
 
@@ -1179,7 +1179,7 @@ void IMAPSession::login(ErrorCode * pError)
     mAutomaticConfigurationDone = true;
     
     * pError = ErrorNone;
-    MCLog("login ok");
+    MCLogVerbose("login ok");
 }
 
 void IMAPSession::selectIfNeeded(String * folder, ErrorCode * pError)
@@ -1266,11 +1266,13 @@ void IMAPSession::select(String * folder, ErrorCode * pError)
 {
     int r;
 
-    MCLog("select");
+    MCLogVerbose("select");
     MCAssert(mState == STATE_LOGGEDIN || mState == STATE_SELECTED);
 
     r = mailimap_select(mImap, MCUTF8(folder));
-    MCLog("select error : %i", r);
+    if (r != MAILIMAP_NO_ERROR || MCLogVerboseEnabled) {
+        MCLog("select error : %i", r);
+    }
     if (r == MAILIMAP_ERROR_STREAM) {
         mShouldDisconnect = true;
         * pError = ErrorConnection;
@@ -1325,7 +1327,7 @@ void IMAPSession::select(String * folder, ErrorCode * pError)
 
     mState = STATE_SELECTED;
     * pError = ErrorNone;
-    MCLog("select ok");
+    MCLogVerbose("select ok");
 }
 
 
@@ -1336,7 +1338,7 @@ IMAPFolderStatus * IMAPSession::folderStatus(String * folder, ErrorCode * pError
 {
     int r;
     
-    MCLog("status");
+    MCLogVerbose("status");
     MCAssert(mState == STATE_LOGGEDIN || mState == STATE_SELECTED);
 
     struct mailimap_mailbox_data_status * status;
@@ -1359,7 +1361,9 @@ IMAPFolderStatus * IMAPSession::folderStatus(String * folder, ErrorCode * pError
     fs = new IMAPFolderStatus();
     fs->autorelease();
     
-    MCLog("status error : %i", r);
+    if (r != MAILIMAP_NO_ERROR || MCLogVerboseEnabled) {
+        MCLog("status error : %i", r);
+    }
     if (r == MAILIMAP_ERROR_STREAM) {
         mShouldDisconnect = true;
         * pError = ErrorConnection;
@@ -3067,7 +3071,9 @@ Data * IMAPSession::fetchNonDecodedMessageAttachment(String * folder, bool ident
 
     mProgressCallback = NULL;
     
-    MCLog("had error : %i", r);
+    if (r != MAILIMAP_NO_ERROR || MCLogVerboseEnabled) {
+        MCLog("had error : %i", r);
+    }
     if (r == MAILIMAP_ERROR_STREAM) {
         mShouldDisconnect = true;
         * pError = ErrorConnection;
@@ -3611,7 +3617,9 @@ IndexSet * IMAPSession::search(String * folder, IMAPSearchExpression * expressio
         r = mailimap_uid_search(mImap, charset, key, &result_list);
     }
     mailimap_search_key_free(key);
-    MCLog("had error : %i", r);
+    if (r != MAILIMAP_NO_ERROR || MCLogVerboseEnabled) {
+        MCLog("had error : %i", r);
+    }
     if (r == MAILIMAP_ERROR_STREAM) {
         mShouldDisconnect = true;
         * pError = ErrorConnection;
