@@ -181,6 +181,9 @@ namespace mailcore {
         // without the queue's check that an operation is running. For tests, which need a cut that
         // lands with nothing on the wire. Declared last, like needsReconnect().
         virtual void cancelStream();
+        // Declared last, like needsReconnect().
+        virtual void setLogoutOnDisconnectEnabled(bool enabled);
+        virtual bool isLogoutOnDisconnectEnabled();
     };
     
 }

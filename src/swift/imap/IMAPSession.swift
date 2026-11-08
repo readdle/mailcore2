@@ -257,6 +257,13 @@ public class MCOIMAPSession: NSObjectCompat {
         get { return session.isVoIPEnabled }
         set { session.isVoIPEnabled = newValue }
     }
+
+    /// When enabled, a logged-in connection sends LOGOUT before it is closed, without waiting for
+    /// the reply. Applies to connections created after it is set. Off by default.
+    public var isLogoutOnDisconnectEnabled: Bool {
+        get { return session.isLogoutOnDisconnectEnabled }
+        set { session.isLogoutOnDisconnectEnabled = newValue }
+    }
     
     public var isIdleEnabled: Bool {
         get { return session.isIdleEnabled }

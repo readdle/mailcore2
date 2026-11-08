@@ -67,6 +67,7 @@ IMAPAsyncSession::IMAPAsyncSession()
     mConnectionType = ConnectionTypeClear;
     mCheckCertificateEnabled = true;
     mVoIPEnabled = true;
+    mLogoutOnDisconnectEnabled = false;
     mQResyncCompatible = true;
     mDefaultNamespace = NULL;
     mTimeout = 30.;
@@ -202,6 +203,16 @@ bool IMAPAsyncSession::isVoIPEnabled()
     return mVoIPEnabled;
 }
 
+void IMAPAsyncSession::setLogoutOnDisconnectEnabled(bool enabled)
+{
+    mLogoutOnDisconnectEnabled = enabled;
+}
+
+bool IMAPAsyncSession::isLogoutOnDisconnectEnabled()
+{
+    return mLogoutOnDisconnectEnabled;
+}
+
 void IMAPAsyncSession::setQResyncCompatible(bool compatible)
 {
     mQResyncCompatible = compatible;
@@ -317,6 +328,7 @@ IMAPAsyncConnection * IMAPAsyncSession::session()
     session->setTimeout(mTimeout);
     session->setCheckCertificateEnabled(mCheckCertificateEnabled);
     session->setVoIPEnabled(mVoIPEnabled);
+    session->setLogoutOnDisconnectEnabled(mLogoutOnDisconnectEnabled);
     session->setDefaultNamespace(mDefaultNamespace);
     session->setClientIdentity(mClientIdentity);
 #if MC_HAS_GCD

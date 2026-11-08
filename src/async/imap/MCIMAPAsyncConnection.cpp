@@ -235,6 +235,16 @@ bool IMAPAsyncConnection::isVoIPEnabled()
     return mSession->isVoIPEnabled();
 }
 
+void IMAPAsyncConnection::setLogoutOnDisconnectEnabled(bool enabled)
+{
+    mSession->setLogoutOnDisconnectEnabled(enabled);
+}
+
+bool IMAPAsyncConnection::isLogoutOnDisconnectEnabled()
+{
+    return mSession->isLogoutOnDisconnectEnabled();
+}
+
 void IMAPAsyncConnection::setQResyncCompatible(bool compatible)
 {
     mSession->setQResyncCompatible(compatible);
