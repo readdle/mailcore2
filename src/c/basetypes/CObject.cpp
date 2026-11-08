@@ -36,3 +36,7 @@ void CObject_setLogger(MCLogger logger) {
 void CObject_setLoggerEnabled(bool enable) {
     MCLogEnabled = enable;
 }
+
+void CObject_setLoggerVerboseEnabled(bool enable) {
+    MCLogVerboseEnabled = enable;
+}

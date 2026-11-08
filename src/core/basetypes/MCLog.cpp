@@ -25,6 +25,7 @@
 
 static pid_t sPid = -1;
 int MCLogEnabled = 0;
+int MCLogVerboseEnabled = 1;
 
 INITIALIZE(Log)
 {

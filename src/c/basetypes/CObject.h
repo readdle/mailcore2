@@ -24,6 +24,7 @@ extern "C" {
     C_SYNTHESIZE_STATIC_FUNC_DEFINITION(CObject, void, setMCAssertHandler, MCLogger);
     C_SYNTHESIZE_STATIC_FUNC_DEFINITION(CObject, void, setLogger, MCLogger);
     C_SYNTHESIZE_STATIC_FUNC_DEFINITION(CObject, void, setLoggerEnabled, bool);
+    C_SYNTHESIZE_STATIC_FUNC_DEFINITION(CObject, void, setLoggerVerboseEnabled, bool);
     
     CMAILCORE_EXPORT CObject CObject_new_WithUInt32(uint32_t string)
     CF_SWIFT_NAME(CObject.init(uint32:));

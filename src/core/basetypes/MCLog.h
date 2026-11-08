@@ -7,9 +7,14 @@
 
 #define MCLog(...) MCLogInternal(NULL, __FILE__, __LINE__, 0, __VA_ARGS__)
 #define MCLogStack(...) MCLogInternal(NULL, __FILE__, __LINE__, 1, __VA_ARGS__)
+#define MCLogVerbose(...) do { if (MCLogVerboseEnabled) { MCLog(__VA_ARGS__); } } while (0)
 
 MAILCORE_EXPORT
 extern int MCLogEnabled;
+
+// Lines that trace a command that succeeded. On by default; errors are logged regardless.
+MAILCORE_EXPORT
+extern int MCLogVerboseEnabled;
     
 #ifndef __printflike
 #define __printflike(a,b)
