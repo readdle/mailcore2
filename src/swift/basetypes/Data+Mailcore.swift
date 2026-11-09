@@ -46,7 +46,7 @@ extension Data {
     
 }
 
-#if os(Android) || os(Windows)
+#if os(Android) || os(Windows) || os(Linux)
 #else
     
 extension NSData {
