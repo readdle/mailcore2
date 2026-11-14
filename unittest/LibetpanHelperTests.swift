@@ -14,10 +14,7 @@ import MailCore
 public class LibetpanHelperTests: XCTestCase {
     
     override public func setUp() {
-        // swift-corelibs-foundation on Linux traps in the `NSTimeZone.default` setter.
-        #if !os(Linux)
-        NSTimeZone.default = TimeZone(identifier: "Europe/Kiev")!
-        #endif
+        NSTimeZone.default = TimeZone(identifier: "Europe/Kyiv")!
     }
     
     func testDates() {
