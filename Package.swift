@@ -176,11 +176,11 @@ let products: [Product] = [
 ]
 
 let dependencies: [Package.Dependency] = [
-    .package(name: "libetpan", url: "https://github.com/readdle/libetpan.git", .branch("feature/CLI-267-linux-support-for-sparkly-and-its-dependencies")),
+    .package(name: "libetpan", url: "https://github.com/readdle/libetpan.git", .exact("1.9.3-readdle.10")),
     .package(name: "tidy-html5", url: "https://github.com/readdle/tidy-html5.git", .exact("5.4.0-readdle.29")),
-    .package(name: "ctemplate", url: "https://github.com/readdle/ctemplate.git", .branch("feature/CLI-267-linux-support-for-sparkly-and-its-dependencies")),
+    .package(name: "ctemplate", url: "https://github.com/readdle/ctemplate.git", .exact("2.2.3-readdle.5")),
     .package(name: "unicode", url: "https://github.com/readdle/swift-unicode", .exact("68.2.0")),
-    .package(name: "libxml", url: "https://github.com/readdle/swift-libxml.git", .branch("libxml2-unix"))
+    .package(name: "libxml", url: "https://github.com/readdle/swift-libxml.git", .exact("0.0.4"))
 ]
 
 var targets: [Target] = [
