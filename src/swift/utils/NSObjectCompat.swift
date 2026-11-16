@@ -9,7 +9,7 @@
 import Foundation
 import CMailCore
 
-#if swift(>=4) && !os(Android) && !os(Windows)
+#if swift(>=4) && !os(Android) && !os(Windows) && !os(Linux)
     @objc(mco_NSObjectCompat)
     @objcMembers
     public class NSObjectCompat: NSObject {}

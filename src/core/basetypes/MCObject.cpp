@@ -310,7 +310,7 @@ static void performOnMainThread(void * info)
     free(data);
 }
  
-#if !defined(__ANDROID__)
+#if !defined(__ANDROID__) && !defined(__linux__)
 void Object::performMethodOnMainThread(Method method, void * context, bool waitUntilDone)
 {
     struct mainThreadCallData * data;

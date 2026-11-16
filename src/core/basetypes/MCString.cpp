@@ -13,7 +13,7 @@
 #include <unicode/ucnv.h>
 #include <unicode/utypes.h>
 
-#if !defined(_MSC_VER) && !defined(ANDROID) && !defined(__ANDROID__)
+#if !defined(_MSC_VER) && !defined(ANDROID) && !defined(__ANDROID__) && !defined(__linux__)
 #include <uuid/uuid.h>
 #endif
 
@@ -1438,7 +1438,7 @@ String * String::extractedSubjectAndKeepBracket(bool keepBracket)
     return str;
 }
 
-#if defined(ANDROID) || defined(__ANDROID__)
+#if defined(ANDROID) || defined(__ANDROID__) || defined(__linux__)
 
 String * String::uuidString()
 {

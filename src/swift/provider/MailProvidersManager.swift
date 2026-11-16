@@ -16,7 +16,7 @@ public class MCOMailProvidersManager: NSObjectCompat {
     private override init() {
         super.init()
 
-        #if !os(Android) && !os(Windows)
+        #if !os(Android) && !os(Windows) && !os(Linux)
         let filename: String?
         #if SWIFT_PACKAGE
         filename = Bundle.module.path(forResource: "providers", ofType: "json")
