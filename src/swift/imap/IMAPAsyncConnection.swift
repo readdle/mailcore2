@@ -82,8 +82,18 @@ public class MCOIMAPAsyncConnection: NSObjectCompat {
         return UInt(bitPattern: connection.instance)
     }
 
-    internal var operationsCount: UInt32 {
+    /// Operations queued on this connection, the running one included.
+    public var operationsCount: UInt32 {
         return connection.operationsCount
+    }
+
+    /**
+     True when the next command on this connection connects and logs in first: never connected,
+     torn down (idle delay, a dropped socket, a disconnect) or marked for a reconnect. A socket
+     still in its login reads false; operationsCount tells that one apart.
+     */
+    public var needsReconnect: Bool {
+        return connection.needsReconnect
     }
 
     /**

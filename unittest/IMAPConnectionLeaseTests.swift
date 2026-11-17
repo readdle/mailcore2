@@ -589,6 +589,45 @@ final class IMAPConnectionLeaseTests: XCTestCase {
                      "A pool connection that has never logged in must not claim a login moment")
     }
 
+    /// A check-account pinned to a leased connection is a login and nothing else: it warms that
+    /// very connection, which then owes no reconnect until its socket goes.
+    func testCheckAccountWarmsTheLeasedConnectionAndNeedsReconnectFollowsTheSocket() throws {
+        let endpoint = try LeaseTestTCPEndpoint(greeting: "* OK [CAPABILITY IMAP4rev1] LeaseTestTCPEndpoint ready\r\n",
+                                                answers: ["LOGIN": "",
+                                                          "CAPABILITY": "* CAPABILITY IMAP4rev1\r\n",
+                                                          "LIST": "* LIST (\\Noselect) \"/\" \"\"\r\n"])
+        defer { endpoint.stop() }
+
+        let session = makeSession(port: endpoint.port, maximumConnections: 1)
+
+        guard let leased = session.acquireConnection(folder: nil) else {
+            return XCTFail("An empty pool with room for 1 connection must satisfy the lease")
+        }
+
+        XCTAssertTrue(leased.needsReconnect, "A never-connected connection owes a reconnect")
+
+        runOffMainThread(timeout: 30) {
+            let checkAccount = session.checkAccountOperation()
+            checkAccount.setConnection(leased)
+            var error: Error?
+            let finished = DispatchSemaphore(value: 0)
+            checkAccount.start { opError in
+                error = opError
+                finished.signal()
+            }
+            XCTAssertEqual(finished.wait(timeout: .now() + 5), .success)
+            XCTAssertNil(error)
+            XCTAssertEqual(endpoint.acceptedClientCount, 1, "The pinned check-account must log in the leased connection")
+            XCTAssertFalse(leased.needsReconnect, "A logged-in connection owes no reconnect")
+            XCTAssertNotNil(leased.lastLoginDate)
+
+            XCTAssertEqual(self.start(leased.disconnectOperation()).wait(timeout: .now() + 5), .success)
+            XCTAssertTrue(leased.needsReconnect, "A torn-down connection owes a reconnect again")
+
+            session.releaseConnection(leased, disconnect: false)
+        }
+    }
+
     func testConnectionScopedDisconnectTearsTheSocketButKeepsTheLease() throws {
         let endpoint = try LeaseTestTCPEndpoint(greeting: "* OK [CAPABILITY IMAP4rev1] LeaseTestTCPEndpoint ready\r\n")
         defer { endpoint.stop() }
