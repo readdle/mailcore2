@@ -4553,6 +4553,12 @@ bool IMAPSession::needsReconnect()
     return mState == STATE_DISCONNECTED || mShouldDisconnect || mStreamCancelled;
 }
 
+bool IMAPSession::isLoggedIn()
+{
+    int state = mState;
+    return (state == STATE_LOGGEDIN || state == STATE_SELECTED) && !mShouldDisconnect && !mStreamCancelled;
+}
+
 void IMAPSession::scheduleReconnect()
 {
     mShouldDisconnect = true;

@@ -82,8 +82,27 @@ public class MCOIMAPAsyncConnection: NSObjectCompat {
         return UInt(bitPattern: connection.instance)
     }
 
-    internal var operationsCount: UInt32 {
+    /**
+     Operations queued on this connection, the running one included. A snapshot: starting an
+     operation adds to it on the session's dispatch queue, and the connection's own thread takes a
+     finished one off before its callback runs. Read on the session's dispatch queue, where starts
+     are serialized, a zero stays zero until the caller starts something.
+     */
+    public var operationsCount: UInt32 {
         return connection.operationsCount
+    }
+
+    /**
+     True when the connection is logged in and its next command needs no reconnect. False when it
+     was never connected, is torn down or marked for a reconnect, is still logging in, or its LOGIN
+     was refused - a refusal leaves the socket connected but not logged in.
+
+     A snapshot, safe to read from any thread: an operation running on the connection changes it
+     at any moment. It holds only while `operationsCount` is zero, read on the session's dispatch
+     queue.
+     */
+    public var isLoggedIn: Bool {
+        return connection.isLoggedIn
     }
 
     /**
