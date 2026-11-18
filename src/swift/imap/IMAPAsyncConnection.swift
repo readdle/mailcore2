@@ -88,12 +88,12 @@ public class MCOIMAPAsyncConnection: NSObjectCompat {
     }
 
     /**
-     True when the next command on this connection connects and logs in first: never connected,
-     torn down (idle delay, a dropped socket, a disconnect) or marked for a reconnect. A socket
-     still in its login reads false; operationsCount tells that one apart.
+     True when the connection is logged in and its next command needs no reconnect. False when it
+     was never connected, is torn down or marked for a reconnect, is still logging in, or its LOGIN
+     was refused - a refusal leaves the socket connected but not logged in.
      */
-    public var needsReconnect: Bool {
-        return connection.needsReconnect
+    public var isLoggedIn: Bool {
+        return connection.isLoggedIn
     }
 
     /**

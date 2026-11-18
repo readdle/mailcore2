@@ -589,9 +589,9 @@ final class IMAPConnectionLeaseTests: XCTestCase {
                      "A pool connection that has never logged in must not claim a login moment")
     }
 
-    /// A check-account pinned to a leased connection is a login and nothing else: it warms that
-    /// very connection, which then owes no reconnect until its socket goes.
-    func testCheckAccountWarmsTheLeasedConnectionAndNeedsReconnectFollowsTheSocket() throws {
+    /// A check-account pinned to a leased connection is a login and nothing else: it logs in that
+    /// very connection, which then reads logged in until its socket goes.
+    func testCheckAccountLogsInTheLeasedConnectionAndIsLoggedInFollowsTheSocket() throws {
         let endpoint = try LeaseTestTCPEndpoint(greeting: "* OK [CAPABILITY IMAP4rev1] LeaseTestTCPEndpoint ready\r\n",
                                                 answers: ["LOGIN": "",
                                                           "CAPABILITY": "* CAPABILITY IMAP4rev1\r\n",
@@ -604,7 +604,7 @@ final class IMAPConnectionLeaseTests: XCTestCase {
             return XCTFail("An empty pool with room for 1 connection must satisfy the lease")
         }
 
-        XCTAssertTrue(leased.needsReconnect, "A never-connected connection owes a reconnect")
+        XCTAssertFalse(leased.isLoggedIn, "A never-connected connection is not logged in")
 
         runOffMainThread(timeout: 30) {
             let checkAccount = session.checkAccountOperation()
@@ -618,11 +618,43 @@ final class IMAPConnectionLeaseTests: XCTestCase {
             XCTAssertEqual(finished.wait(timeout: .now() + 5), .success)
             XCTAssertNil(error)
             XCTAssertEqual(endpoint.acceptedClientCount, 1, "The pinned check-account must log in the leased connection")
-            XCTAssertFalse(leased.needsReconnect, "A logged-in connection owes no reconnect")
+            XCTAssertTrue(leased.isLoggedIn)
             XCTAssertNotNil(leased.lastLoginDate)
 
             XCTAssertEqual(self.start(leased.disconnectOperation()).wait(timeout: .now() + 5), .success)
-            XCTAssertTrue(leased.needsReconnect, "A torn-down connection owes a reconnect again")
+            XCTAssertFalse(leased.isLoggedIn, "A torn-down connection is not logged in")
+
+            session.releaseConnection(leased, disconnect: false)
+        }
+    }
+
+    /// A refused LOGIN leaves the socket connected - nothing owes a reconnect - but not logged in.
+    func testARefusedLoginLeavesTheConnectionNotLoggedIn() throws {
+        let refusal = LeaseTestTCPEndpoint.Refusal(reply: { "\($0) NO [AUTHENTICATIONFAILED] Invalid credentials\r\n" },
+                                                   closesConnection: false)
+        let endpoint = try LeaseTestTCPEndpoint(greeting: "* OK [CAPABILITY IMAP4rev1] LeaseTestTCPEndpoint ready\r\n",
+                                                answers: ["CAPABILITY": "* CAPABILITY IMAP4rev1\r\n"],
+                                                refusals: ["LOGIN": refusal])
+        defer { endpoint.stop() }
+
+        let session = makeSession(port: endpoint.port, maximumConnections: 1)
+
+        guard let leased = session.acquireConnection(folder: nil) else {
+            return XCTFail("An empty pool with room for 1 connection must satisfy the lease")
+        }
+
+        runOffMainThread(timeout: 30) {
+            let checkAccount = session.checkAccountOperation()
+            checkAccount.setConnection(leased)
+            var error: Error?
+            let finished = DispatchSemaphore(value: 0)
+            checkAccount.start { opError in
+                error = opError
+                finished.signal()
+            }
+            XCTAssertEqual(finished.wait(timeout: .now() + 5), .success)
+            XCTAssertNotNil(error, "The refusal must reach the operation")
+            XCTAssertFalse(leased.isLoggedIn, "A refused login must not read as logged in")
 
             session.releaseConnection(leased, disconnect: false)
         }
