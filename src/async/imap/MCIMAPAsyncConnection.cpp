@@ -309,6 +309,11 @@ bool IMAPAsyncConnection::needsReconnect()
     return mSession->needsReconnect();
 }
 
+bool IMAPAsyncConnection::isLoggedIn()
+{
+    return mSession->isLoggedIn();
+}
+
 void IMAPAsyncConnection::scheduleReconnect()
 {
     mSession->scheduleReconnect();

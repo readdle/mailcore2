@@ -184,6 +184,8 @@ namespace mailcore {
         // Declared last, like needsReconnect().
         virtual void setLogoutOnDisconnectEnabled(bool enabled);
         virtual bool isLogoutOnDisconnectEnabled();
+        // See IMAPSession::isLoggedIn(). Declared last, like needsReconnect().
+        virtual bool isLoggedIn();
     };
     
 }

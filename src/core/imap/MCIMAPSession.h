@@ -277,6 +277,13 @@ namespace mailcore {
         // without waiting for the reply. Off by default. Declared last, like needsReconnect().
         virtual void setLogoutOnDisconnectEnabled(bool enabled);
         virtual bool isLogoutOnDisconnectEnabled();
+        // Whether the session is logged in and its next command needs no reconnect. Not the same
+        // as !needsReconnect(): a refused LOGIN leaves the socket connected but not logged in.
+        // Any thread: the state is read atomically, but the operation running on the session
+        // changes it at any moment, so the answer holds only while no operation is queued - read it
+        // with operationsCount() == 0 on the dispatch queue that starts operations on this session.
+        // Declared last, like needsReconnect().
+        virtual bool isLoggedIn();
 
     private:
         String * mHostname;
